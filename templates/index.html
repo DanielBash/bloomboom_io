@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Socket Debugger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body { background-color: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px; }
+        h2 { color: #4CAF50; }
+        #logArea {
+            width: 100%;
+            height: 400px;
+            background-color: #000000;
+            color: #00FF00;
+            border: 1px solid #333;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        #status { font-weight: bold; margin-bottom: 10px; }
+        .connected { color: #4CAF50; }
+        .disconnected { color: #f44336; }
+    </style>
+</head>
+<body>
+
+    <h2>Server Data Log</h2>
+    <div id="status">Status: <span id="connText" class="disconnected">Disconnected</span></div>
+
+    <textarea id="logArea" readonly placeholder="Waiting for server data..."></textarea>
+
+    <script>
+        const socket = io();
+        const logArea = document.getElementById('logArea');
+        const connText = document.getElementById('connText');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.value += `[${timestamp}] ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        socket.on('connect', () => {
+            connText.textContent = 'Connected';
+            connText.className = 'connected';
+            log('--- CLIENT CONNECTED TO SERVER ---');
+        });
+
+        socket.on('disconnect', () => {
+            connText.textContent = 'Disconnected';
+            connText.className = 'disconnected';
+            log('--- CLIENT DISCONNECTED ---');
+        });
+
+        socket.onAny((eventName, ...args) => {
+            if (eventName === 'connect' || eventName === 'disconnect') return;
+
+            let payload = "";
+            try {
+                payload = JSON.stringify(args);
+            } catch (e) {
+                payload = args.toString();
+            }
+
+            log(`EVENT: ${eventName} | DATA: ${payload}`);
+        });
+    </script>
+</body>
+</html>
