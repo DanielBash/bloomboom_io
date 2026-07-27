@@ -1,7 +1,9 @@
 """The core of the website."""
+import datetime
 
 import settings
 from core.logger import log
+from werkzeug.security import generate_password_hash, check_password_hash
 from .models import Flower, db
 
 
@@ -24,15 +26,34 @@ def register_flower(username='flower', password=None, permission_group=settings.
     if does_username_exist > 0:
         return
 
+    if password is None:
+        log.error(f'Cannot register flower without a password: {username}')
+        return
+
+    hashed_password = generate_password_hash(password)
+
     flower = Flower(
         username=username,
-        password=password,
+        password=hashed_password,
         permission_group=permission_group,
     )
 
     db.session.add(flower)
     db.session.commit()
 
-    log.info(f'Flower registered: {username}')
+    log.info(f'Flower registered: {username}.')
 
+    return flower
+
+def login_flower(username, password):
+    flower = Flower.query.filter_by(username=username).first()
+
+    if flower and check_password_hash(flower.password, password):
+        flower.last_visit = datetime.datetime.now()
+        db.session.commit()
+        return flower
+    return None
+
+def get_flower(username):
+    flower = Flower.query.filter_by(username=username).first()
     return flower

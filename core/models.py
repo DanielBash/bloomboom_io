@@ -16,8 +16,13 @@ class Flower(db.Model, SerializerMixin):
     username = db.Column(db.String(20), nullable=False)
     permission_group = db.Column(db.String(50), nullable=False)
 
+    xp = db.Column(db.Integer, default=0)
+    petals = db.Column(db.Text, default='')
+
     registered_at = db.Column(db.DateTime, server_default=db.func.now())
     last_visit = db.Column(db.DateTime, server_default=db.func.now())
+    is_online = db.Column(db.Boolean, default=False)
+    is_playing = db.Column(db.Boolean, default=False)
 
     def get_permission(self, name):
         permissions = settings.PERMISSION_GROUPS.get(self.permission_group)

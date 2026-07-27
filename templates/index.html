@@ -2,70 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Socket Debugger</title>
+    <title>bloomboom.io</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <style>
-        body { background-color: #1e1e1e; color: #d4d4d4; font-family: monospace; padding: 20px; }
-        h2 { color: #4CAF50; }
-        #logArea {
-            width: 100%;
-            height: 400px;
-            background-color: #000000;
-            color: #00FF00;
-            border: 1px solid #333;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 14px;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        #status { font-weight: bold; margin-bottom: 10px; }
-        .connected { color: #4CAF50; }
-        .disconnected { color: #f44336; }
-    </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+<div id="logo">bloomboom.io</div>
 
-    <h2>Server Data Log</h2>
-    <div id="status">Status: <span id="connText" class="disconnected">Disconnected</span></div>
+<div id="loading-screen">
+    <div class="loading-text">
+        <span>l</span>
+        <span>o</span>
+        <span>a</span>
+        <span>d</span>
+        <span>i</span>
+        <span>n</span>
+        <span>g</span>
+    </div>
+</div>
 
-    <textarea id="logArea" readonly placeholder="Waiting for server data..."></textarea>
+<div id="login-container">
+    <input type="text" placeholder="flower name" required id="loginusername">
+    <input type="password" placeholder="password" required id="loginpassword">
+    <div class="checkbox-wrapper">
+        <input type="checkbox" id="signuptoggle">
+        <label for="signuptoggle" class="checkbox-label">new flower?</label>
+    </div>
+    <div id="loginerror"></div>
+    <button type="button" id="loginbutton">submit</button>
+</div>
 
-    <script>
-        const socket = io();
-        const logArea = document.getElementById('logArea');
-        const connText = document.getElementById('connText');
-
-        function log(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            logArea.value += `[${timestamp}] ${message}\n`;
-            logArea.scrollTop = logArea.scrollHeight;
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
-
-        socket.on('connect', () => {
-            connText.textContent = 'Connected';
-            connText.className = 'connected';
-            log('--- CLIENT CONNECTED TO SERVER ---');
-        });
-
-        socket.on('disconnect', () => {
-            connText.textContent = 'Disconnected';
-            connText.className = 'disconnected';
-            log('--- CLIENT DISCONNECTED ---');
-        });
-
-        socket.onAny((eventName, ...args) => {
-            if (eventName === 'connect' || eventName === 'disconnect') return;
-
-            let payload = "";
-            try {
-                payload = JSON.stringify(args);
-            } catch (e) {
-                payload = args.toString();
-            }
-
-            log(`EVENT: ${eventName} | DATA: ${payload}`);
-        });
-    </script>
+    }
+</script>
+<script src="{{ url_for('static', filename='js/index.js') }}" type="module"></script>
 </body>
 </html>
