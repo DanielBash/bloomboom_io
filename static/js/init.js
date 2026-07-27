@@ -3,7 +3,8 @@
 
 import * as THREE from 'three';
 import * as STATE from './state.js';
-import {init_models, play_animation} from './utils.js'; // Import the new init function
+import {apply_toon_and_outlines} from './utils.js'; // Import the new init function
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 function init_scene() {
     const G = STATE.settings.graphical;
@@ -75,27 +76,88 @@ function init_clock() {
     STATE.state.clock = clock;
 }
 
+export async function init_models() {
+    if (!STATE.state.models) {
+        STATE.state.models = {};
+    }
+
+    const modelNames = await new Promise((resolve) => {
+        const socket = STATE.state.connection;
+        if (!socket) {
+            console.error("[ERROR] No socket.io connection available in STATE.state.connection");
+            resolve([]);
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            console.error("[ERROR] Timed out waiting for assets-response from server");
+            socket.off("assets-response");
+            resolve([]);
+        }, 15000);
+
+        socket.once("assets-response", (data) => {
+            clearTimeout(timeoutId);
+
+            if (!data || data['status'] === "ERROR") {
+                console.error("[ERROR] Failed to fetch assets list:", data);
+                resolve([]);
+                return;
+            }
+
+            const models = (data['response'] && data['response']['models']) || [];
+            resolve(models);
+        });
+
+        socket.emit("assets");
+    });
+
+    if (modelNames.length === 0) {
+        console.warn("[WARN] No models returned from server, skipping model loading.");
+        return;
+    }
+
+    const baseUrl = `${window.location.protocol}//${window.location.host}`;
+    const loader = new GLTFLoader();
+    const modelPromises = [];
+
+    for (const name of modelNames) {
+        const url = `${baseUrl}/static/models/${name}.gltf`;
+
+        const promise = loader.loadAsync(url)
+            .then((gltf) => {
+                const processedModel = apply_toon_and_outlines(gltf.scene, 0x000000);
+
+                const mixer = new THREE.AnimationMixer(processedModel);
+
+                const actions = {};
+                gltf.animations.forEach((clip) => {
+                    actions[clip.name] = mixer.clipAction(clip);
+                });
+
+                processedModel.userData.mixer = mixer;
+                processedModel.userData.actions = actions;
+                STATE.state.models[name] = processedModel;
+                console.log(`[INFO] Model loaded: ${name}`);
+            })
+            .catch((err) => {
+                console.error(`[ERROR] Failed to load model: ${name} from ${url}`, err);
+                STATE.state.models[name] = null;
+            });
+
+        modelPromises.push(promise);
+    }
+
+    await Promise.all(modelPromises);
+}
+
 export function init() {
     console.log('[INFO] Engine loading.')
+    init_connection();
+    init_models().then(() => {
+    });
     init_clock();
     init_scene();
     init_lighting();
-    init_connection();
     init_listeners();
-    init_models().then(() => {
-        const flower = STATE.settings.models.flower_game;
-
-        flower.scale.set(1, 1, 1);
-
-        const camera = STATE.state.camera;
-        const distance = 5;
-        const forward = new THREE.Vector3();
-        camera.getWorldDirection(forward);
-
-        flower.position.copy(camera.position).addScaledVector(forward, distance);
-
-        STATE.state.scene.add(flower);
-        play_animation(flower, "walking", false);
-    });
     console.log('[INFO] Engine loaded.')
 }

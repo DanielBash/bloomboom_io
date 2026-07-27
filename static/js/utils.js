@@ -4,7 +4,6 @@
 import * as STATE from "./state.js";
 import * as THREE from 'three';
 import * as SHADERS from "./shaders.js";
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export function create_mesh(geometry, shapeColor, outlineColor, outlineThickness = STATE.settings.graphical.border_width) {
     const mainMat = new THREE.MeshToonMaterial({
@@ -92,49 +91,6 @@ export function apply_toon_and_outlines(object, outlineColor, outlineThickness =
     });
 
     return object;
-}
-
-export async function init_models() {
-    const loader = new GLTFLoader();
-    const modelPromises = [];
-
-    for (const [name, modelData] of Object.entries(STATE.settings.models)) {
-        if (modelData === null) {
-            const url = `http://localhost:8080/static/models/${name}.gltf`;
-
-            const promise = loader.loadAsync(url)
-                .then((gltf) => {
-                    const processedModel = apply_toon_and_outlines(gltf.scene, 0x000000);
-
-                    // --- ANIMATION SETUP ---
-                    // 1. Create a mixer for this specific model
-                    const mixer = new THREE.AnimationMixer(processedModel);
-
-                    // 2. Map all animations from the GLTF into actions
-                    const actions = {};
-                    gltf.animations.forEach((clip) => {
-                        actions[clip.name] = mixer.clipAction(clip);
-                    });
-
-                    // 3. Store the mixer and actions on the model's userData
-                    // This keeps everything bundled together in one object
-                    processedModel.userData.mixer = mixer;
-                    processedModel.userData.actions = actions;
-                    // -----------------------
-
-                    STATE.settings.models[name] = processedModel;
-                    console.log(`[INFO] Model loaded: ${name}`);
-                })
-                .catch((err) => {
-                    console.error(`[ERROR] Failed to load model: ${name} from ${url}`, err);
-                    STATE.settings.models[name] = null;
-                });
-
-            modelPromises.push(promise);
-        }
-    }
-
-    await Promise.all(modelPromises);
 }
 
 export function play_animation(model, actionName, loopOnce = false) {

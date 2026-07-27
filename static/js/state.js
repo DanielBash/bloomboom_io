@@ -75,10 +75,6 @@ export const settings = {
         'elem_loginbutton_click': action_login,
         'elem_playbutton_click': action_play
     },
-    models: {
-        "flower": null,
-        "flower_game": null,
-    },
 };
 
 export let state = {
@@ -90,6 +86,8 @@ export let state = {
     connection: null,
     flower: null,
     clock: null,
+    objects: [],
+    models: {}
 };
 
 state = new Proxy(state, {
