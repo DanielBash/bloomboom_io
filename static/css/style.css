@@ -116,7 +116,7 @@ body {
     border-color: #555;
 }
 
-#login-container button {
+.cartoon_btn {
     font-family: 'Ubuntu', sans-serif;
     font-weight: 700;
     font-size: 1.1rem;
@@ -130,12 +130,12 @@ body {
     box-shadow: 0 4px 0px #0d3610;
 }
 
-#login-container button:hover {
+.cartoon_btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 0px #0d3610;
 }
 
-#login-container button:active {
+.cartoon_btn:active {
     transform: translateY(4px);
     box-shadow: 0 0px 0px #0d3610;
 }
@@ -185,7 +185,7 @@ body {
     background-position: center;
 }
 
-.checkboxlabel {
+.checkbox-label {
     font-family: 'Ubuntu', sans-serif;
     font-weight: 700;
     font-size: 1rem;
@@ -204,4 +204,41 @@ body {
 
 #loginerror:empty {
     display: none;
+}
+
+#game-screen,
+#lobby-screen {
+  display: none;
+}
+#game-screen {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+}
+
+#lobby-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+}
+
+.lobby-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background-color: white;
+  border: 4px solid black;
+  border-radius: 16px;
+  padding: 20px 30px;
+  box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.4);
+}
+
+#lobbynickname {
+  font-family: 'Ubuntu', sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: black;
 }

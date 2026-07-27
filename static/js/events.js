@@ -24,6 +24,23 @@ export function event_scene_login() {
     console.log('[INFO] Switching scene to login.')
     document.getElementById('loading-screen').style.display = 'none';
     document.getElementById('login-container').style.display = 'flex';
+    document.getElementById('game-screen').style.display = 'none';
+}
+
+export function event_scene_lobby() {
+    console.log('[INFO] Switching scene to lobby.')
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('login-container').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('lobby-screen').style.display = 'flex';
+}
+
+export function event_scene_game() {
+    console.log('[INFO] Switching scene to game.')
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('login-container').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'flex';
+    document.getElementById('lobby-screen').style.display = 'none';
 }
 
 // - connection events
@@ -32,6 +49,8 @@ export function event_connection_login_response(data) {
     if (data["status"] === "OK") {
         console.log("[INFO] Login successful.");
         error_text.innerText = "";
+        STATE.state.scene_name = "lobby";
+        document.getElementById('lobbynickname').innerText = data["response"]["username"];
     } else {
         error_text.innerText = data["response"];
     }

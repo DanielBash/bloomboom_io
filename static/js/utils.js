@@ -4,6 +4,7 @@
 import * as STATE from "./state.js";
 import * as THREE from 'three';
 import * as SHADERS from "./shaders.js";
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export function create_mesh(geometry, shapeColor, outlineColor, outlineThickness = STATE.settings.graphical.border_width) {
     const mainMat = new THREE.MeshToonMaterial({
@@ -16,7 +17,9 @@ export function create_mesh(geometry, shapeColor, outlineColor, outlineThickness
     const outlineMat = new THREE.ShaderMaterial({
         uniforms: {
             offset: { value: outlineThickness },
-            outlineColor: { value: new THREE.Color(outlineColor) }
+            outlineColor: { value: new THREE.Color(outlineColor) },
+            map: { value: null },
+            hasMap: { value: 0.0 }
         },
         vertexShader: SHADERS.shader_vertex_border,
         fragmentShader: SHADERS.shader_fragment_border,
@@ -28,4 +31,127 @@ export function create_mesh(geometry, shapeColor, outlineColor, outlineThickness
     group.add(outlineMesh);
     group.add(mainMesh);
     return group;
+}
+
+export function apply_toon_and_outlines(object, outlineColor, outlineThickness = STATE.settings.graphical.border_width) {
+    const meshes = [];
+    object.traverse((child) => {
+        if (child.isMesh) {
+            meshes.push(child);
+        }
+    });
+
+    meshes.forEach((child) => {
+        const oldMat = child.material;
+
+        const matOptions = {
+            map: oldMat.map || null,
+            color: oldMat.color ? oldMat.color.clone() : new THREE.Color(0xffffff),
+            normalMap: oldMat.normalMap || null,
+            transparent: oldMat.transparent || false,
+            alphaTest: oldMat.alphaTest || 0,
+            side: oldMat.side || THREE.FrontSide
+        };
+
+        if (STATE.state && STATE.state.gradientMap) {
+            matOptions.gradientMap = STATE.state.gradientMap;
+        }
+
+        const toonMat = new THREE.MeshToonMaterial(matOptions);
+        child.material = toonMat;
+        child.castShadow = true;
+
+        child.geometry.computeBoundingBox();
+        const size = new THREE.Vector3();
+        child.geometry.boundingBox.getSize(size);
+
+        const minDim = Math.min(size.x, size.y, size.z);
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        const isPane = maxDim > 0 && (minDim / maxDim < 0.01);
+
+        if (!isPane) {
+            const outlineMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    offset: { value: outlineThickness },
+                    outlineColor: { value: new THREE.Color(outlineColor) },
+                    map: { value: oldMat.map || null },
+                    hasMap: { value: oldMat.map ? 1.0 : 0.0 }
+                },
+                vertexShader: SHADERS.shader_vertex_border,
+                fragmentShader: SHADERS.shader_fragment_border,
+                side: THREE.BackSide
+            });
+
+            const outlineMesh = new THREE.Mesh(child.geometry, outlineMat);
+            outlineMesh.castShadow = false;
+            outlineMesh.receiveShadow = false;
+
+            child.add(outlineMesh);
+        }
+    });
+
+    return object;
+}
+
+export async function init_models() {
+    const loader = new GLTFLoader();
+    const modelPromises = [];
+
+    for (const [name, modelData] of Object.entries(STATE.settings.models)) {
+        if (modelData === null) {
+            const url = `http://localhost:8080/static/models/${name}.gltf`;
+
+            const promise = loader.loadAsync(url)
+                .then((gltf) => {
+                    const processedModel = apply_toon_and_outlines(gltf.scene, 0x000000);
+
+                    // --- ANIMATION SETUP ---
+                    // 1. Create a mixer for this specific model
+                    const mixer = new THREE.AnimationMixer(processedModel);
+
+                    // 2. Map all animations from the GLTF into actions
+                    const actions = {};
+                    gltf.animations.forEach((clip) => {
+                        actions[clip.name] = mixer.clipAction(clip);
+                    });
+
+                    // 3. Store the mixer and actions on the model's userData
+                    // This keeps everything bundled together in one object
+                    processedModel.userData.mixer = mixer;
+                    processedModel.userData.actions = actions;
+                    // -----------------------
+
+                    STATE.settings.models[name] = processedModel;
+                    console.log(`[INFO] Model loaded: ${name}`);
+                })
+                .catch((err) => {
+                    console.error(`[ERROR] Failed to load model: ${name} from ${url}`, err);
+                    STATE.settings.models[name] = null;
+                });
+
+            modelPromises.push(promise);
+        }
+    }
+
+    await Promise.all(modelPromises);
+}
+
+export function play_animation(model, actionName, loopOnce = false) {
+    if (!model || !model.userData.actions || !model.userData.actions[actionName]) {
+        console.warn("[ERROR] Couldn't play animation " + actionName + ".");
+        return;
+    }
+
+    const action = model.userData.actions[actionName];
+
+    if (loopOnce) {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+    } else {
+        action.setLoop(THREE.LoopRepeat, Infinity);
+    }
+
+    action.reset();
+    action.play();
 }

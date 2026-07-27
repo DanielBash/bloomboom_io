@@ -2,19 +2,16 @@
 // Start the client.
 
 import * as THREE from 'three';
-import * as STATE from './state.js'
+import * as STATE from './state.js';
+import {init_models, play_animation} from './utils.js'; // Import the new init function
 
 function init_scene() {
     const G = STATE.settings.graphical;
-
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(G.background_color);
 
     const camera = new THREE.PerspectiveCamera(
-        G.fov,
-        window.innerWidth / window.innerHeight,
-        G.near,
-        G.far
+        G.fov, window.innerWidth / window.innerHeight, G.near, G.far
     );
     camera.position.set(12, 12, 0);
 
@@ -38,9 +35,7 @@ function init_lighting() {
 
     const dirLight = new THREE.DirectionalLight(G.directional.color, G.directional.intensity);
     dirLight.position.set(
-        G.directional.position.x,
-        G.directional.position.y,
-        G.directional.position.z
+        G.directional.position.x, G.directional.position.y, G.directional.position.z
     );
     dirLight.castShadow = G.directional.cast_shadow;
     dirLight.shadow.mapSize.width = G.directional.shadow_map_size;
@@ -51,7 +46,6 @@ function init_lighting() {
     dirLight.shadow.camera.bottom = G.directional.shadow_camera.bottom;
 
     scene.add(dirLight);
-
     STATE.state.dirLight = dirLight;
 }
 
@@ -64,29 +58,44 @@ function init_listeners() {
     Object.entries(STATE.settings.event_listeners).forEach(([eventType, handler]) => {
         if (eventType.startsWith("elem_")) {
             const parts = eventType.split('_');
-
             const eventName = parts.pop();
             const elementId = parts.slice(1).join('_');
-
             const element = document.getElementById(elementId);
-            if (element) {
-                element.addEventListener(eventName, handler);
-            }
-        }
-        else if (eventType.startsWith("connection_")) {
+            if (element) element.addEventListener(eventName, handler);
+        } else if (eventType.startsWith("connection_")) {
             STATE.state.connection.on(eventType.slice(11), handler);
-        }
-        else {
+        } else {
             window.addEventListener(eventType, handler);
         }
     });
 }
 
+function init_clock() {
+    const clock = new THREE.Clock();
+    STATE.state.clock = clock;
+}
+
 export function init() {
-    console.log('[INFO] Setting up the engine.')
+    console.log('[INFO] Engine loading.')
+    init_clock();
     init_scene();
     init_lighting();
     init_connection();
     init_listeners();
-    console.log('[INFO] The engine is ready.')
+    init_models().then(() => {
+        const flower = STATE.settings.models.flower_game;
+
+        flower.scale.set(1, 1, 1);
+
+        const camera = STATE.state.camera;
+        const distance = 5;
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+
+        flower.position.copy(camera.position).addScaledVector(forward, distance);
+
+        STATE.state.scene.add(flower);
+        play_animation(flower, "walking", false);
+    });
+    console.log('[INFO] Engine loaded.')
 }

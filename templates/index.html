@@ -34,7 +34,16 @@
         <label for="signuptoggle" class="checkbox-label">new flower?</label>
     </div>
     <div id="loginerror"></div>
-    <button type="button" id="loginbutton">submit</button>
+    <button type="button" id="loginbutton" class="cartoon_btn">submit</button>
+</div>
+
+<div id="game-screen"></div>
+
+<div id="lobby-screen">
+  <div class="lobby-content">
+    <span id="lobbynickname">player_name</span>
+    <button id="playbutton" class="cartoon_btn">play</button>
+  </div>
 </div>
 
 <script type="importmap">
@@ -45,6 +54,7 @@
         }
     }
 </script>
+
 <script src="{{ url_for('static', filename='js/index.js') }}" type="module"></script>
 </body>
 </html>

@@ -59,7 +59,7 @@ def on_login(data):
     flower.is_online = True
     db.session.commit()
 
-    emit('login-response', status_response())
+    emit('login-response', status_response({'username': data['username'], 'password': data['password']}))
 
 
 @socket_io.on('disconnect')

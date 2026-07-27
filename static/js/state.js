@@ -8,11 +8,11 @@ import {
     event_connection_login_response,
     event_connection_signup_response,
     event_disconnect,
-    event_keydown,
+    event_keydown, event_scene_game, event_scene_lobby,
     event_scene_login,
     event_window_resize
 } from "./events.js";
-import {action_login} from "./actions.js";
+import {action_login, action_play} from "./actions.js";
 
 export const settings = {
     graphical: {
@@ -20,11 +20,11 @@ export const settings = {
         fov: 60,
         near: 0.1,
         far: 1000,
-        border_width: 0.05,
+        border_width: 0.02,
 
         renderer: {
             antialias: true,
-            shadow_map_enabled: true,
+            shadow_map_enabled: false,
             shadow_map_type: THREE.PCFSoftShadowMap,
             clear_color: 0x87CEEB
         },
@@ -35,8 +35,8 @@ export const settings = {
         directional: {
             color: 0xffffff,
             intensity: 1.2,
-            position: {x: 10, y: 20, z: 10},
-            cast_shadow: true,
+            position: {x: 0, y: 0, z: 0},
+            cast_shadow: false,
             shadow_map_size: 2048,
             shadow_camera: {
                 left: -30,
@@ -44,11 +44,6 @@ export const settings = {
                 top: 30,
                 bottom: -30
             }
-        },
-        floor: {
-            size: 100,
-            color: 0x90EE90,
-            rotation_x: -Math.PI / 2
         },
         outline: {
             thickness: 0.05,
@@ -73,10 +68,17 @@ export const settings = {
 
         // - scene events
         'scene_name_login': event_scene_login,
+        'scene_name_lobby': event_scene_lobby,
+        'scene_name_game': event_scene_game,
 
         // - element events
         'elem_loginbutton_click': action_login,
-    }
+        'elem_playbutton_click': action_play
+    },
+    models: {
+        "flower": null,
+        "flower_game": null,
+    },
 };
 
 export let state = {
@@ -87,6 +89,7 @@ export let state = {
     scene_name: "loading",
     connection: null,
     flower: null,
+    clock: null,
 };
 
 state = new Proxy(state, {

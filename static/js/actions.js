@@ -25,3 +25,7 @@ export function action_login() {
         });
     }
 }
+
+export function action_play() {
+    STATE.state.scene_name = "game";
+}
