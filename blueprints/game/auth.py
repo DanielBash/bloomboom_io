@@ -42,7 +42,8 @@ def on_login(data):
 
     username = data['username']
     password = data['password']
-    flower = login_flower(username, password)
+    flower_model = login_flower(username, password)
+    flower = flower_model.username
     if not flower:
         emit('login-response', status_response('Incorrect username or password.'))
         return
@@ -56,7 +57,7 @@ def on_login(data):
         'flower': flower,
         'mob': None
     }
-    flower.is_online = True
+    flower_model.is_online = True
     db.session.commit()
 
     emit('login-response', status_response({'username': data['username'], 'password': data['password']}))
@@ -70,7 +71,8 @@ def on_disconnect():
     if conn:
         flower = conn['flower']
         if flower:
-            flower.is_online = False
+            flower_model = get_flower(flower)
+            flower_model.is_online = False
             db.session.commit()
     emit('disconnect-response', status_response())
 

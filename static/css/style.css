@@ -1,29 +1,88 @@
+/* ==========================================================================
+   1. CSS VARIABLES (Design Tokens)
+   ========================================================================== */
+:root {
+    /* Colors */
+    --color-bg: #555;
+    --color-text-dark: black;
+    --color-text-light: white;
+    --color-primary: #1b5e20;
+    --color-primary-light: #a5d6a7;
+    --color-primary-border: #66bb6a;
+    --color-primary-shadow: #0d3610;
+    --color-error: #d32f2f;
+
+    /* Typography */
+    --font-main: 'Ubuntu', sans-serif;
+
+    /* Borders & Shadows */
+    --border-thick: 4px solid black;
+    --border-medium: 3px solid black;
+    --shadow-cartoon: 6px 6px 0px rgba(0, 0, 0, 0.4);
+    --shadow-btn: 0 4px 0px var(--color-primary-shadow);
+}
+
+/* ==========================================================================
+   2. BASE & RESETS
+   ========================================================================== */
+*, *::before, *::after {
+    box-sizing: border-box; /* Ensures padding/borders don't expand elements */
+}
+
 body {
     margin: 0;
     overflow: hidden;
-    font-family: 'Ubuntu', sans-serif;
+    font-family: var(--font-main);
 }
 
+/* ==========================================================================
+   3. GLOBAL UI COMPONENTS
+   ========================================================================== */
 #logo {
     position: absolute;
     top: 15px;
     left: 15px;
-    font-weight: 700;
-    font-size: 1.2rem;
-    color: white;
-    -webkit-text-stroke: 1px black;
-    text-shadow: 2px 2px 0px black;
     z-index: 100;
     pointer-events: none;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--color-text-light);
+    -webkit-text-stroke: 1px var(--color-text-dark);
+    text-shadow: 2px 2px 0px var(--color-text-dark);
 }
 
+/* Cartoon Button */
+.cartoon_btn {
+    padding: 10px 15px;
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--color-primary-light);
+    background-color: var(--color-primary);
+    border: 3px solid var(--color-primary-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    box-shadow: var(--shadow-btn);
+}
+
+.cartoon_btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 0px var(--color-primary-shadow);
+}
+
+.cartoon_btn:active {
+    transform: translateY(4px);
+    box-shadow: 0 0px 0px var(--color-primary-shadow);
+}
+
+/* ==========================================================================
+   4. LOADING SCREEN
+   ========================================================================== */
 #loading-screen {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: #555;
+    inset: 0; /* Shorthand for top:0; left:0; width:100vw; height:100vh; */
+    background-color: var(--color-bg);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -31,14 +90,13 @@ body {
 }
 
 .loading-text {
-    font-family: 'Ubuntu', sans-serif;
-    font-weight: 700;
-    font-size: 2.5rem;
-    color: white;
-    -webkit-text-stroke: 1px black;
-    text-shadow: 2px 2px 0px black;
     display: flex;
     gap: 2px;
+    font-weight: 700;
+    font-size: 2.5rem;
+    color: var(--color-text-light);
+    -webkit-text-stroke: 1px var(--color-text-dark);
+    text-shadow: 2px 2px 0px var(--color-text-dark);
 }
 
 .loading-text span {
@@ -46,6 +104,7 @@ body {
     animation: wave-jump 1s ease-in-out infinite;
 }
 
+/* Wave Animation Delays */
 .loading-text span:nth-child(1) {
     animation-delay: 0s;
 }
@@ -83,71 +142,76 @@ body {
     }
 }
 
+/* ==========================================================================
+   5. LOGIN SCREEN
+   ========================================================================== */
 #login-container {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: white;
-    border: 4px solid black;
-    border-radius: 16px;
-    padding: 24px;
-    display: none;
+    display: none; /* Hidden by default */
     flex-direction: column;
     gap: 15px;
+    padding: 24px;
+    background-color: var(--color-text-light);
+    border: var(--border-thick);
+    border-radius: 16px;
+    box-shadow: var(--shadow-cartoon);
     z-index: 100;
-    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.4);
 }
 
+/* Form Inputs */
 #login-container input {
-    font-family: 'Ubuntu', sans-serif;
+    padding: 10px 15px;
+    font-family: var(--font-main);
     font-weight: 700;
     font-size: 1rem;
-    color: black;
-    background-color: white;
-    border: 3px solid black;
+    color: var(--color-text-dark);
+    background-color: var(--color-text-light);
+    border: var(--border-medium);
     border-radius: 8px;
-    padding: 10px 15px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s ease;
 }
 
 #login-container input:focus {
-    border-color: #555;
+    border-color: var(--color-bg);
 }
 
-.cartoon_btn {
-    font-family: 'Ubuntu', sans-serif;
+/* Input Placeholder & Autofill Fixes */
+#login-container input::placeholder {
+    font-family: var(--font-main);
     font-weight: 700;
-    font-size: 1.1rem;
-    padding: 10px 15px;
-    background-color: #1b5e20;
-    color: #a5d6a7;
-    border: 3px solid #66bb6a;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
-    box-shadow: 0 4px 0px #0d3610;
+    color: #888;
 }
 
-.cartoon_btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0px #0d3610;
+#login-container input:-webkit-autofill,
+#login-container input:-webkit-autofill:hover,
+#login-container input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text-dark);
+    -webkit-box-shadow: 0 0 0px 1000px var(--color-text-light) inset;
+    font-family: var(--font-main) !important;
+    font-weight: 700 !important;
+    transition: background-color 5000s ease-in-out 0s;
 }
 
-.cartoon_btn:active {
-    transform: translateY(4px);
-    box-shadow: 0 0px 0px #0d3610;
-}
-
-
+/* Custom Checkbox */
 .checkbox-wrapper {
     display: flex;
     align-items: center;
     gap: 10px;
+    align-self: center;
     cursor: pointer;
     user-select: none;
-    align-self: center;
+}
+
+.checkbox-label {
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--color-text-dark);
+    cursor: pointer;
 }
 
 #login-container #signuptoggle {
@@ -157,21 +221,20 @@ body {
     height: 24px;
     padding: 0;
     margin: 0;
-    box-sizing: border-box;
-    background-color: white;
-    border: 3px solid black;
-    border-radius: 5px;
-    cursor: pointer;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    transition: background-color 0.2s, border-color 0.2s;
+    background-color: var(--color-text-light);
+    border: var(--border-medium);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 #login-container #signuptoggle:checked {
-    background-color: white;
-    border-color: black;
+    background-color: var(--color-text-light);
+    border-color: var(--color-text-dark);
 }
 
 #login-container #signuptoggle:checked::after {
@@ -185,19 +248,12 @@ body {
     background-position: center;
 }
 
-.checkbox-label {
-    font-family: 'Ubuntu', sans-serif;
-    font-weight: 700;
-    font-size: 1rem;
-    color: black;
-    cursor: pointer;
-}
-
+/* Error Message */
 #loginerror {
-    font-family: 'Ubuntu', sans-serif;
+    font-family: var(--font-main);
     font-weight: 700;
     font-size: 0.9rem;
-    color: #d32f2f;
+    color: var(--color-error);
     min-height: 1.2rem;
     text-align: center;
 }
@@ -206,39 +262,68 @@ body {
     display: none;
 }
 
+/* ==========================================================================
+   6. GAME & LOBBY SCREENS
+   ========================================================================== */
 #game-screen,
 #lobby-screen {
-  display: none;
+    display: none; /* Hidden by default */
 }
+
 #game-screen {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 100;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
 }
 
 #lobby-screen {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 100;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
 }
 
 .lobby-content {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  background-color: white;
-  border: 4px solid black;
-  border-radius: 16px;
-  padding: 20px 30px;
-  box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 30px;
+    background-color: var(--color-text-light);
+    border: var(--border-thick);
+    border-radius: 16px;
+    box-shadow: var(--shadow-cartoon);
 }
 
 #lobbynickname {
-  font-family: 'Ubuntu', sans-serif;
-  font-weight: 700;
-  font-size: 1.5rem;
-  color: black;
+    font-family: var(--font-main);
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--color-text-dark);
+}
+
+#login-container input::placeholder {
+    font-family: var(--font-main);
+    font-weight: 700;
+    color: #888;
+}
+
+@keyframes autofill-font-fix {
+    0%, 100% {
+        -webkit-text-fill-color: var(--color-text-dark);
+    }
+}
+
+#login-container input:-webkit-autofill,
+#login-container input:-webkit-autofill:hover,
+#login-container input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-text-dark) !important;
+    -webkit-box-shadow: 0 0 0px 1000px var(--color-text-light) inset !important;
+    font-family: var(--font-main) !important;
+    font-weight: 700 !important;
+
+    animation: autofill-font-fix 1s infinite;
+
+    transition: background-color 5000s ease-in-out 0s;
 }
