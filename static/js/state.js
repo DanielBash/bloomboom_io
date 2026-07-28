@@ -8,9 +8,13 @@ import {
     event_connection_login_response,
     event_connection_signup_response,
     event_disconnect,
-    event_keydown, event_scene_game, event_scene_lobby,
+    event_keydown,
+    event_scene_game,
+    event_scene_lobby,
     event_scene_login,
-    event_window_resize
+    event_state,
+    event_window_resize,
+    event_world_map
 } from "./events.js";
 import {action_login, action_play} from "./actions.js";
 
@@ -20,7 +24,8 @@ export const settings = {
         fov: 60,
         near: 0.1,
         far: 1000,
-        border_width: 0.02,
+        scene_scale: 32,
+        render_radius: 11,
 
         renderer: {
             antialias: true,
@@ -45,10 +50,6 @@ export const settings = {
                 bottom: -30
             }
         },
-        outline: {
-            thickness: 0.05,
-            gradient_steps: [80, 255]
-        }
     },
 
     keybindings: {
@@ -65,6 +66,7 @@ export const settings = {
         'connection_disconnect': event_disconnect,
         'connection_login-response': event_connection_login_response,
         'connection_signup-response': event_connection_signup_response,
+        'connection_state': event_state,
 
         // - scene events
         'scene_name_login': event_scene_login,
@@ -73,21 +75,39 @@ export const settings = {
 
         // - element events
         'elem_loginbutton_click': action_login,
-        'elem_playbutton_click': action_play
+        'elem_playbutton_click': action_play,
+
+        // - state changes
+        'statechange_world_map': event_world_map,
     },
 };
 
 export let state = {
+    frames: 0,
     camera: null,
     renderer: null,
     scene: null,
     dirLight: null,
     scene_name: "loading",
     connection: null,
-    flower: null,
     clock: null,
     objects: [],
-    models: {}
+    models: {},
+    game_state: {
+        'world': {
+            'map': [],
+            'flower': {
+                'position': {
+                    'x': 0,
+                    'y': 0
+                }
+            }
+        }
+    },
+    object_groups: {
+        'map': [[]],
+        'shown_map': new Set(),
+    }
 };
 
 state = new Proxy(state, {

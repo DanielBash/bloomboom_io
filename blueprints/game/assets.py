@@ -10,11 +10,6 @@ from core.core import login_flower, get_flower, register_flower
 from core.models import db
 
 socket_io = app.socket_io
-app.assets = {
-    'models': [],
-}
-for i in Path('static/models').iterdir():
-    app.assets['models'].append(i.stem)
 
 def status_response(response=None):
     status = 'OK'
@@ -25,4 +20,7 @@ def status_response(response=None):
 
 @socket_io.on('assets')
 def on_connect():
-    emit('assets-response', status_response(app.assets))
+    emit('assets-response', status_response({
+        'models': app.game_state['models'],
+        'map': app.game_state['map']
+    }))

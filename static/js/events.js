@@ -2,6 +2,15 @@
 // Handle events.
 
 import * as STATE from './state.js'
+import {clear_map, clone_model, play_animation} from "./utils.js";
+import * as THREE from 'three';
+
+const eventEmitter = {
+    emit(eventName, data) {
+        const event = new CustomEvent(eventName, { detail: data });
+        window.dispatchEvent(event);
+    }
+};
 
 // - DOM events
 export function event_window_resize() {
@@ -77,4 +86,63 @@ export function event_connect() {
 export function event_disconnect() {
     console.log('[INFO] The client is disconnected.')
     window.location.reload();
+}
+
+function isPlainObject(val) {
+    return val !== null && typeof val === 'object' && !Array.isArray(val);
+}
+
+export function event_state(data) {
+    const response = data['response'];
+    if (!response) return;
+
+    deepUpdate(STATE.state.game_state, response, 'statechange');
+}
+
+function deepUpdate(target, newData, pathPrefix) {
+    for (const key in newData) {
+        if (!Object.prototype.hasOwnProperty.call(newData, key)) continue;
+
+        const newValue = newData[key];
+        const oldValue = target[key];
+        const eventName = `${pathPrefix}_${key}`;
+
+        if (isPlainObject(newValue) && isPlainObject(oldValue)) {
+            deepUpdate(oldValue, newValue, eventName);
+        } else {
+            if (oldValue !== newValue) {
+                target[key] = newValue;
+
+                eventEmitter.emit(eventName, {
+                    newValue: newValue,
+                    oldValue: oldValue
+                });
+            }
+        }
+    }
+}
+
+export function event_world_map() {
+    console.log('[INFO] Map changed.');
+    const mapData = STATE.state.game_state.world.map;
+    if (!mapData || mapData.length === 0) return;
+    clear_map();
+    STATE.state.game_state.world.map = mapData;
+    const rows = mapData.length;
+    let maxCols = 0;
+    for (let row = 0; row < rows; row++) {
+        if (mapData[row] && mapData[row].length > maxCols) {
+            maxCols = mapData[row].length;
+        }
+    }
+    STATE.state.game_state.world.dimensions = { rows, maxCols };
+    if (!STATE.state.object_groups) {
+        STATE.state.object_groups = {};
+    }
+    STATE.state.object_groups.map = [];
+    for (let row = 0; row < rows; row++) {
+        STATE.state.object_groups.map.push(new Array(mapData[row].length).fill(null));
+    }
+
+    STATE.state.object_groups.shown_map = [];
 }

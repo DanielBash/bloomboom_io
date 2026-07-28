@@ -1,101 +1,11 @@
 // PURPOSE:
 // Provide game utils for other modules.
 
-import * as STATE from "./state.js";
 import * as THREE from 'three';
-import * as SHADERS from "./shaders.js";
-
-export function create_mesh(geometry, shapeColor, outlineColor, outlineThickness = STATE.settings.graphical.border_width) {
-    const mainMat = new THREE.MeshToonMaterial({
-        color: shapeColor,
-        gradientMap: STATE.state.gradientMap
-    });
-    const mainMesh = new THREE.Mesh(geometry, mainMat);
-    mainMesh.castShadow = true;
-
-    const outlineMat = new THREE.ShaderMaterial({
-        uniforms: {
-            offset: { value: outlineThickness },
-            outlineColor: { value: new THREE.Color(outlineColor) },
-            map: { value: null },
-            hasMap: { value: 0.0 }
-        },
-        vertexShader: SHADERS.shader_vertex_border,
-        fragmentShader: SHADERS.shader_fragment_border,
-        side: THREE.BackSide
-    });
-    const outlineMesh = new THREE.Mesh(geometry, outlineMat);
-
-    const group = new THREE.Group();
-    group.add(outlineMesh);
-    group.add(mainMesh);
-    return group;
-}
-
-export function apply_toon_and_outlines(object, outlineColor, outlineThickness = STATE.settings.graphical.border_width) {
-    const meshes = [];
-    object.traverse((child) => {
-        if (child.isMesh) {
-            meshes.push(child);
-        }
-    });
-
-    meshes.forEach((child) => {
-        const oldMat = child.material;
-
-        const matOptions = {
-            map: oldMat.map || null,
-            color: oldMat.color ? oldMat.color.clone() : new THREE.Color(0xffffff),
-            normalMap: oldMat.normalMap || null,
-            transparent: oldMat.transparent || false,
-            alphaTest: oldMat.alphaTest || 0,
-            side: oldMat.side || THREE.FrontSide
-        };
-
-        if (STATE.state && STATE.state.gradientMap) {
-            matOptions.gradientMap = STATE.state.gradientMap;
-        }
-
-        const toonMat = new THREE.MeshToonMaterial(matOptions);
-        child.material = toonMat;
-        child.castShadow = true;
-
-        child.geometry.computeBoundingBox();
-        const size = new THREE.Vector3();
-        child.geometry.boundingBox.getSize(size);
-
-        const minDim = Math.min(size.x, size.y, size.z);
-        const maxDim = Math.max(size.x, size.y, size.z);
-
-        const isPane = maxDim > 0 && (minDim / maxDim < 0.01);
-
-        if (!isPane) {
-            const outlineMat = new THREE.ShaderMaterial({
-                uniforms: {
-                    offset: { value: outlineThickness },
-                    outlineColor: { value: new THREE.Color(outlineColor) },
-                    map: { value: oldMat.map || null },
-                    hasMap: { value: oldMat.map ? 1.0 : 0.0 }
-                },
-                vertexShader: SHADERS.shader_vertex_border,
-                fragmentShader: SHADERS.shader_fragment_border,
-                side: THREE.BackSide
-            });
-
-            const outlineMesh = new THREE.Mesh(child.geometry, outlineMat);
-            outlineMesh.castShadow = false;
-            outlineMesh.receiveShadow = false;
-
-            child.add(outlineMesh);
-        }
-    });
-
-    return object;
-}
+import * as STATE from "./state.js";
 
 export function play_animation(model, actionName, loopOnce = false) {
     if (!model || !model.userData.actions || !model.userData.actions[actionName]) {
-        console.warn("[ERROR] Couldn't play animation " + actionName + ".");
         return;
     }
 
@@ -110,4 +20,120 @@ export function play_animation(model, actionName, loopOnce = false) {
 
     action.reset();
     action.play();
+}
+
+export function clone_model(model) {
+    const tempUserData = model.userData;
+    model.userData = {};
+
+    const instance = model.clone();
+
+    model.userData = tempUserData;
+
+    instance.userData = {};
+
+    const mixer = new THREE.AnimationMixer(instance);
+    instance.userData.mixer = mixer;
+    instance.userData.actions = {};
+
+    if (tempUserData && tempUserData.actions) {
+        for (const clipName in tempUserData.actions) {
+            const clip = tempUserData.actions[clipName].getClip();
+            instance.userData.actions[clipName] = mixer.clipAction(clip);
+        }
+    }
+    return instance
+}
+
+export function create_map(x, y) {
+    const mapData = STATE.state.game_state.world.map;
+    if (!mapData[y] || !mapData[y][x]) return null;
+
+    const modelName = mapData[y][x];
+    const models = STATE.state.models;
+    const spacing = STATE.settings.graphical.scene_scale;
+
+    const originalModel = models ? models[modelName] : null;
+    if (!originalModel) {
+        console.warn(`[WARN] Model "${modelName}" not found in STATE.state.models.`);
+        return null;
+    }
+
+    const instance = clone_model(originalModel);
+
+    const { rows, maxCols } = STATE.state.game_state.world.dimensions;
+
+    const posX = x * spacing - ((maxCols - 1) * spacing) / 2;
+    const posY = -1;
+    const posZ = y * spacing - ((rows - 1) * spacing) / 2;
+
+    instance.position.set(posX, posY, posZ);
+    instance.scale.set(spacing, spacing, spacing);
+
+    if (STATE.state.scene) {
+        STATE.state.scene.add(instance);
+    }
+
+    if (!STATE.state.objects) {
+        STATE.state.objects = [];
+    }
+    STATE.state.objects.push(instance);
+
+    STATE.state.object_groups.map[y][x] = instance;
+
+    play_animation(instance, "default", false);
+
+    return instance;
+}
+
+export function hide_map(x, y) {
+    try {
+        if (STATE.state.object_groups.map[y] && STATE.state.object_groups.map[y][x]) {
+            STATE.state.object_groups.map[y][x].visible = false;
+        }
+    } catch (e) {}
+}
+
+export function show_map(x, y) {
+    try {
+        if (STATE.state.object_groups.map[y] && STATE.state.object_groups.map[y][x]) {
+            STATE.state.object_groups.map[y][x].visible = true;
+        } else {
+            create_map(x, y);
+        }
+
+        const shown_map = STATE.state.object_groups.shown_map;
+        let exists = false;
+        for (let i = 0; i < shown_map.length; i++) {
+            if (shown_map[i][0] === x && shown_map[i][1] === y) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            shown_map.push([x, y]);
+        }
+    } catch (e) {}
+}
+export function clear_map() {
+    const objMap = STATE.state.object_groups?.map;
+
+    if (objMap) {
+        for (let y = 0; y < objMap.length; y++) {
+            if (objMap[y]) {
+                for (let x = 0; x < objMap[y].length; x++) {
+                    const obj = objMap[y][x];
+                    if (obj) {
+                        if (STATE.state.scene) {
+                            STATE.state.scene.remove(obj);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (STATE.state.object_groups) {
+        STATE.state.object_groups.map = [];
+        STATE.state.object_groups.shown_map = [];
+    }
 }

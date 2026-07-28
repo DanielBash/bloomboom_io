@@ -1,7 +1,8 @@
 """Socketio game i/o."""
 
-from flask import current_app as app
+
 # -- importing modules
+from flask import current_app as app
 from flask import request
 from flask_socketio import emit, disconnect
 
@@ -10,10 +11,6 @@ from core.core import login_flower, get_flower, register_flower
 from core.models import db
 
 socket_io = app.socket_io
-app.game_state = {
-    'mobs': [],
-    'connections': {},
-}
 
 
 def status_response(response=None):
@@ -61,6 +58,7 @@ def on_login(data):
     db.session.commit()
 
     emit('login-response', status_response({'username': data['username'], 'password': data['password']}))
+    emit('state', status_response({'world': {'map': app.game_state['map']}}))
 
 
 @socket_io.on('disconnect')

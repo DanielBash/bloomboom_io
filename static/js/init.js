@@ -3,7 +3,6 @@
 
 import * as THREE from 'three';
 import * as STATE from './state.js';
-import {apply_toon_and_outlines} from './utils.js'; // Import the new init function
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 function init_scene() {
@@ -125,8 +124,7 @@ export async function init_models() {
 
         const promise = loader.loadAsync(url)
             .then((gltf) => {
-                const processedModel = apply_toon_and_outlines(gltf.scene, 0x000000);
-
+                const processedModel = gltf.scene;
                 const mixer = new THREE.AnimationMixer(processedModel);
 
                 const actions = {};
@@ -153,8 +151,7 @@ export async function init_models() {
 export function init() {
     console.log('[INFO] Engine loading.')
     init_connection();
-    init_models().then(() => {
-    });
+    init_models().then();
     init_clock();
     init_scene();
     init_lighting();
