@@ -3,47 +3,56 @@
 
 import * as THREE from 'three';
 import * as STATE from './state.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
-function init_scene() {
-    const G = STATE.settings.graphical;
+function init_scene(fov, near, far, background_color, antialias, shadow_map_enabled, shadow_map_type) {
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(G.background_color);
+    scene.background = new THREE.Color(background_color);
 
     const camera = new THREE.PerspectiveCamera(
-        G.fov, window.innerWidth / window.innerHeight, G.near, G.far
+        fov, window.innerWidth / window.innerHeight, near, far
     );
     camera.position.set(12, 12, 0);
 
-    const renderer = new THREE.WebGLRenderer({antialias: G.renderer.antialias});
+    const renderer = new THREE.WebGLRenderer({
+        antialias: antialias,
+        powerPreference: "high-performance"
+    });
+
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = G.renderer.shadow_map_enabled;
-    renderer.shadowMap.type = G.renderer.shadow_map_type;
+
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    renderer.shadowMap.enabled = shadow_map_enabled;
+    renderer.shadowMap.type = shadow_map_type;
     document.body.appendChild(renderer.domElement);
 
     STATE.state.scene = scene;
     STATE.state.camera = camera;
     STATE.state.renderer = renderer;
+    STATE.state.controls = new OrbitControls(camera, renderer.domElement);
+    STATE.state.controls.enablePan = false;
+    STATE.state.controls.minDistance = 16.0;
+    STATE.state.controls.maxDistance = 150.0;
+    STATE.state.controls.maxPolarAngle = Math.PI / 2.1;
 }
 
 function init_lighting() {
-    const G = STATE.settings.graphical;
     const scene = STATE.state.scene;
 
-    const ambient = new THREE.AmbientLight(G.ambient.color, G.ambient.intensity);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambient);
 
-    const dirLight = new THREE.DirectionalLight(G.directional.color, G.directional.intensity);
-    dirLight.position.set(
-        G.directional.position.x, G.directional.position.y, G.directional.position.z
-    );
-    dirLight.castShadow = G.directional.cast_shadow;
-    dirLight.shadow.mapSize.width = G.directional.shadow_map_size;
-    dirLight.shadow.mapSize.height = G.directional.shadow_map_size;
-    dirLight.shadow.camera.left = G.directional.shadow_camera.left;
-    dirLight.shadow.camera.right = G.directional.shadow_camera.right;
-    dirLight.shadow.camera.top = G.directional.shadow_camera.top;
-    dirLight.shadow.camera.bottom = G.directional.shadow_camera.bottom;
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(0, 0, 0);
+    dirLight.castShadow = false;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.left = -30;
+    dirLight.shadow.camera.right = 30;
+    dirLight.shadow.camera.top = 30;
+    dirLight.shadow.camera.bottom = -30;
 
     scene.add(dirLight);
     STATE.state.dirLight = dirLight;
@@ -150,11 +159,22 @@ export async function init_models() {
 
 export function init() {
     console.log('[INFO] Engine loading.')
+
     init_connection();
     init_models().then();
     init_clock();
-    init_scene();
+    const G = STATE.settings.graphical;
+    init_scene(
+        G.fov,
+        G.near,
+        G.far,
+        G.background_color,
+        G.antialias,
+        false,
+        THREE.PCFSoftShadowMap
+    );
     init_lighting();
     init_listeners();
+
     console.log('[INFO] Engine loaded.')
 }

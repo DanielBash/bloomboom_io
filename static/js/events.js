@@ -124,25 +124,16 @@ function deepUpdate(target, newData, pathPrefix) {
 
 export function event_world_map() {
     console.log('[INFO] Map changed.');
+
     const mapData = STATE.state.game_state.world.map;
-    if (!mapData || mapData.length === 0) return;
     clear_map();
     STATE.state.game_state.world.map = mapData;
+
     const rows = mapData.length;
-    let maxCols = 0;
-    for (let row = 0; row < rows; row++) {
-        if (mapData[row] && mapData[row].length > maxCols) {
-            maxCols = mapData[row].length;
-        }
-    }
-    STATE.state.game_state.world.dimensions = { rows, maxCols };
-    if (!STATE.state.object_groups) {
-        STATE.state.object_groups = {};
-    }
+    const cols = mapData[0].length;
+
     STATE.state.object_groups.map = [];
     for (let row = 0; row < rows; row++) {
-        STATE.state.object_groups.map.push(new Array(mapData[row].length).fill(null));
+        STATE.state.object_groups.map.push(new Array(cols).fill(null));
     }
-
-    STATE.state.object_groups.shown_map = [];
 }

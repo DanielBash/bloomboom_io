@@ -46,94 +46,55 @@ export function clone_model(model) {
 }
 
 export function create_map(x, y) {
-    const mapData = STATE.state.game_state.world.map;
-    if (!mapData[y] || !mapData[y][x]) return null;
-
-    const modelName = mapData[y][x];
-    const models = STATE.state.models;
+    const modelName = STATE.state.game_state.world.map[y][x];
+    const model = STATE.state.models[modelName];
+    const instance = clone_model(model);
     const spacing = STATE.settings.graphical.scene_scale;
-
-    const originalModel = models ? models[modelName] : null;
-    if (!originalModel) {
-        console.warn(`[WARN] Model "${modelName}" not found in STATE.state.models.`);
-        return null;
-    }
-
-    const instance = clone_model(originalModel);
-
-    const { rows, maxCols } = STATE.state.game_state.world.dimensions;
-
-    const posX = x * spacing - ((maxCols - 1) * spacing) / 2;
+    const posX = x * spacing;
     const posY = -1;
-    const posZ = y * spacing - ((rows - 1) * spacing) / 2;
-
+    const posZ = y * spacing;
     instance.position.set(posX, posY, posZ);
     instance.scale.set(spacing, spacing, spacing);
-
-    if (STATE.state.scene) {
-        STATE.state.scene.add(instance);
-    }
-
-    if (!STATE.state.objects) {
-        STATE.state.objects = [];
-    }
-    STATE.state.objects.push(instance);
-
+    STATE.state.scene.add(instance);
+    STATE.state.objects['map'].push(instance);
     STATE.state.object_groups.map[y][x] = instance;
-
     play_animation(instance, "default", false);
-
     return instance;
 }
 
 export function hide_map(x, y) {
-    try {
-        if (STATE.state.object_groups.map[y] && STATE.state.object_groups.map[y][x]) {
-            STATE.state.object_groups.map[y][x].visible = false;
-        }
-    } catch (e) {}
+    const map = STATE.state.object_groups.map;
+    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length && map[y][x] != null) {
+        map[y][x].visible = false;
+    }
+    STATE.state.object_groups.shown_map.delete(`${x},${y}`);
 }
 
 export function show_map(x, y) {
-    try {
-        if (STATE.state.object_groups.map[y] && STATE.state.object_groups.map[y][x]) {
-            STATE.state.object_groups.map[y][x].visible = true;
-        } else {
-            create_map(x, y);
-        }
+    const map = STATE.state.object_groups['map'];
 
-        const shown_map = STATE.state.object_groups.shown_map;
-        let exists = false;
-        for (let i = 0; i < shown_map.length; i++) {
-            if (shown_map[i][0] === x && shown_map[i][1] === y) {
-                exists = true;
-                break;
-            }
-        }
-        if (!exists) {
-            shown_map.push([x, y]);
-        }
-    } catch (e) {}
+    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length && map[y][x] != null) {
+        map[y][x].visible = true;
+    } else if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length) {
+        create_map(x, y);
+    }
+
+    const shown_map = STATE.state.object_groups['shown_map'];
+    const key = `${x},${y}`;
+    if (!shown_map.has(key)) {
+        shown_map.add(key);
+    }
 }
-export function clear_map() {
-    const objMap = STATE.state.object_groups?.map;
 
-    if (objMap) {
-        for (let y = 0; y < objMap.length; y++) {
-            if (objMap[y]) {
-                for (let x = 0; x < objMap[y].length; x++) {
-                    const obj = objMap[y][x];
-                    if (obj) {
-                        if (STATE.state.scene) {
-                            STATE.state.scene.remove(obj);
-                        }
-                    }
-                }
-            }
-        }
+export function clear_map() {
+    const objMap = STATE.state.objects['map'];
+
+    for (let y = 0; y < objMap.length; y++) {
+        STATE.state.scene.remove(objMap[y]);
     }
     if (STATE.state.object_groups) {
-        STATE.state.object_groups.map = [];
-        STATE.state.object_groups.shown_map = [];
+        STATE.state.object_groups['map'] = [];
+        STATE.state.object_groups['shown_map'] = new Set();
+        STATE.state.objects['map'] = [];
     }
 }

@@ -2,12 +2,8 @@
 from pathlib import Path
 
 # -- importing modules
-from flask import request
 from flask_socketio import emit, disconnect
 from flask import current_app as app
-import settings
-from core.core import login_flower, get_flower, register_flower
-from core.models import db
 
 socket_io = app.socket_io
 

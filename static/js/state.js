@@ -2,7 +2,6 @@
 // Store app state.
 
 // -- imports
-import * as THREE from 'three';
 import {
     event_connect,
     event_connection_login_response,
@@ -26,30 +25,7 @@ export const settings = {
         far: 1000,
         scene_scale: 32,
         render_radius: 11,
-
-        renderer: {
-            antialias: true,
-            shadow_map_enabled: false,
-            shadow_map_type: THREE.PCFSoftShadowMap,
-            clear_color: 0x87CEEB
-        },
-        ambient: {
-            color: 0xffffff,
-            intensity: 0.6
-        },
-        directional: {
-            color: 0xffffff,
-            intensity: 1.2,
-            position: {x: 0, y: 0, z: 0},
-            cast_shadow: false,
-            shadow_map_size: 2048,
-            shadow_camera: {
-                left: -30,
-                right: 30,
-                top: 30,
-                bottom: -30
-            }
-        },
+        antialias: true,
     },
 
     keybindings: {
@@ -83,6 +59,7 @@ export const settings = {
 };
 
 export let state = {
+    controls: 0,
     frames: 0,
     camera: null,
     renderer: null,
@@ -91,22 +68,31 @@ export let state = {
     scene_name: "loading",
     connection: null,
     clock: null,
-    objects: [],
+    objects: {
+        'map': [],
+        'mobs': []
+    },
     models: {},
     game_state: {
         'world': {
             'map': [],
-            'flower': {
+            'mobs': {}
+        },
+        'flower': {
+            'account': {},
+            'mob': {
                 'position': {
                     'x': 0,
-                    'y': 0
-                }
+                    'y': 0,
+                },
+                'identity': null,
             }
-        }
+        },
     },
     object_groups: {
         'map': [[]],
         'shown_map': new Set(),
+        'mobs': [],
     }
 };
 

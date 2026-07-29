@@ -38,3 +38,6 @@ ADMIN_PERMISSION_GROUP = 'admin'
 
 # -- default user settings
 DEFAULT_PERMISSION_GROUP = 'flower'
+
+# -- gameplay settings
+TPS = 20

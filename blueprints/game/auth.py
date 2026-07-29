@@ -40,11 +40,10 @@ def on_login(data):
     username = data['username']
     password = data['password']
     flower_model = login_flower(username, password)
-    flower = flower_model.username
-    if not flower:
+    if not flower_model:
         emit('login-response', status_response('Incorrect username or password.'))
         return
-
+    flower = flower_model.username
     for existing_sid, conn in list(app.game_state['connections'].items()):
         if conn['flower'] == flower and existing_sid != sid:
             disconnect(existing_sid)
@@ -77,8 +76,6 @@ def on_disconnect():
 
 @socket_io.on('signup')
 def on_signup(data):
-    sid = request.sid
-
     if 'username' not in data or 'password' not in data:
         emit('signup-response', status_response('Please, specify both username and password.'))
         return
@@ -103,3 +100,19 @@ def on_signup(data):
         permission_group=settings.DEFAULT_PERMISSION_GROUP,
     )
     emit('signup-response', status_response({'username': data['username'], 'password': data['password']}))
+
+
+@socket_io.on('personal_state')
+def on_connect():
+    sid = request.sid
+    if sid not in app.game_state['connections']:
+        emit('personal_state-response', status_response('You are not logged in.'))
+        return
+
+    emit('state', {
+        'flower': {
+            'x': 0,
+            'y': 0,
+            'height': 0
+        }
+    })
