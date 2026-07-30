@@ -2,12 +2,11 @@
 // Handle events.
 
 import * as STATE from './state.js'
-import {clear_map, clone_model, play_animation} from "./utils.js";
-import * as THREE from 'three';
+import {clear_map} from "./utils.js";
 
 const eventEmitter = {
     emit(eventName, data) {
-        const event = new CustomEvent(eventName, { detail: data });
+        const event = new CustomEvent(eventName, {detail: data});
         window.dispatchEvent(event);
     }
 };
@@ -26,6 +25,11 @@ export function event_keydown(event) {
         event.preventDefault();
         action(event);
     }
+    STATE.state.keys_pressed[event.code] = true;
+}
+
+export function event_keyup(event) {
+    STATE.state.keys_pressed[event.code] = false;
 }
 
 // - scene switching

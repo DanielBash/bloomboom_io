@@ -98,3 +98,35 @@ export function clear_map() {
         STATE.state.objects['map'] = [];
     }
 }
+
+export function remove_mob(identity) {
+    STATE.state.object_groups.mobs.delete(identity);
+    STATE.state.scene.remove(STATE.state.objects[identity]);
+    delete STATE.state.objects[identity];
+}
+
+export function create_mob(identity) {
+    const data = STATE.state.game_state.world.mobs[identity];
+    const instance = clone_model(STATE.state.models[data['type']]);
+    const spacing = STATE.settings.graphical.scene_scale;
+
+    instance.scale.set(spacing * 0.5, spacing * 0.5, spacing * 0.5);
+
+    STATE.state.objects[identity] = [instance];
+    STATE.state.scene.add(STATE.state.objects[identity][0]);
+    STATE.state.object_groups.mobs.add(identity);
+    play_animation(instance, "default", false);
+    console.log("[INFO] Mob created: " + identity);
+}
+
+export function update_mob_positions() {
+    const spacing = STATE.settings.graphical.scene_scale;
+
+    Object.values(STATE.state.game_state.world.mobs).forEach((mob) => {
+        STATE.state.objects[mob['identity']][0].position.set(
+            mob.position.x * spacing,
+            -1,
+            mob.position.y * spacing,
+        );
+    });
+}

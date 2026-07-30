@@ -40,6 +40,7 @@ def create_app(name):
         app.jinja_env.filters[key] = val
 
     with app.app_context():
-        pass
+        from blueprints.game.loop import game_loop
+        socket_io.start_background_task(game_loop, app)
 
     return app

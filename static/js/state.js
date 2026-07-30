@@ -7,7 +7,7 @@ import {
     event_connection_login_response,
     event_connection_signup_response,
     event_disconnect,
-    event_keydown,
+    event_keydown, event_keyup,
     event_scene_game,
     event_scene_lobby,
     event_scene_login,
@@ -36,6 +36,7 @@ export const settings = {
         // - default events
         'keydown': event_keydown,
         'resize': event_window_resize,
+        'keyup': event_keyup,
 
         // - connection events
         'connection_connect': event_connect,
@@ -88,12 +89,14 @@ export let state = {
                 'identity': null,
             }
         },
+        'scene_name': 'login',
     },
     object_groups: {
         'map': [[]],
         'shown_map': new Set(),
-        'mobs': [],
-    }
+        'mobs': new Set(),
+    },
+    keys_pressed: {}
 };
 
 state = new Proxy(state, {

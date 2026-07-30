@@ -1,11 +1,14 @@
 """The core of the website."""
 import datetime
+import random
+import secrets
+from pathlib import Path
 
 import settings
 from core.logger import log
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import Flower, db
-
+from flask import current_app as app
 
 def create_app(name):
     from .flask_shortcuts import initialize_app
@@ -57,3 +60,39 @@ def login_flower(username, password):
 def get_flower(username):
     flower = Flower.query.filter_by(username=username).first()
     return flower
+
+def init_game():
+    app.game_state = {
+        'mobs': {},
+        'map': [],
+        'connections': {},
+        'models': [],
+    }
+    for i in Path('static/models').iterdir():
+        app.game_state['models'].append(i.stem)
+
+    for row in range(200):
+        row = []
+        for column in range(200):
+            if random.randint(1, 50) == 1:
+                if random.randint(0, 1) == 1:
+                    row.append(f'tree_0')
+                else:
+                    row.append(f'water')
+            else:
+                row.append(f'ground_{random.randint(0, 3)}')
+        app.game_state['map'].append(row)
+
+
+def create_mob(type, position=(0, 0), name='mob'):
+    identity = secrets.token_urlsafe(16)
+    app.game_state['mobs'][identity] = {
+        'type': type,
+        'position': {'x': position[0], 'y': position[1]},
+        'identity': identity,
+        'name': name
+    }
+    return app.game_state['mobs'][identity]
+
+def game_tick():
+    pass

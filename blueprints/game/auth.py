@@ -1,13 +1,12 @@
 """Socketio game i/o."""
 
-
 # -- importing modules
 from flask import current_app as app
 from flask import request
 from flask_socketio import emit, disconnect
 
 import settings
-from core.core import login_flower, get_flower, register_flower
+from core.core import login_flower, get_flower, register_flower, create_mob
 from core.models import db
 
 socket_io = app.socket_io
@@ -18,6 +17,28 @@ def status_response(response=None):
     if response and isinstance(response, str):
         status = 'ERROR'
     return {'status': status, 'response': response}
+
+
+def state_response(sid, include_map=False, include_personal=False):
+    response = {
+        'world': {
+            'mobs': app.game_state['mobs'],
+        },
+    }
+    if include_map:
+        response['world']['map'] = app.game_state['map']
+    if include_personal:
+        flower = get_flower(app.game_state['connections'][sid]['flower'])
+        response['flower'] = {
+            'account': {
+                'username': flower.username,
+                'is_online': flower.is_online,
+                'is_playing': flower.is_playing,
+                'xp': flower.xp,
+            },
+            'mob': app.game_state['connections'][sid]['mob']
+        }
+    return status_response(response)
 
 
 @socket_io.on('connect')
@@ -56,8 +77,9 @@ def on_login(data):
     flower_model.is_online = True
     db.session.commit()
 
-    emit('login-response', status_response({'username': data['username'], 'password': data['password']}))
-    emit('state', status_response({'world': {'map': app.game_state['map']}}))
+    emit('login-response', status_response({'username': data['username']}))
+    emit('state', state_response(sid, include_map=True, include_personal=True))
+    emit('state', state_response({'scene_name': 'lobby'}))
 
 
 @socket_io.on('disconnect')
@@ -101,18 +123,38 @@ def on_signup(data):
     )
     emit('signup-response', status_response({'username': data['username'], 'password': data['password']}))
 
-
-@socket_io.on('personal_state')
-def on_connect():
+@socket_io.on('play')
+def on_play():
     sid = request.sid
+
     if sid not in app.game_state['connections']:
-        emit('personal_state-response', status_response('You are not logged in.'))
+        emit('play-response', status_response('This connection is not logged in.'))
         return
 
-    emit('state', {
-        'flower': {
-            'x': 0,
-            'y': 0,
-            'height': 0
-        }
-    })
+    app.game_state['connections'][sid]['mob'] = create_mob('flower', (0, 0), name=app.game_state['connections'][sid]['flower'])
+    emit('state', state_response(sid, include_map=False, include_personal=True))
+    emit('state', status_response({'scene_name': 'game'}))
+
+@socket_io.on('move')
+def on_move(data):
+    sid = request.sid
+
+    if sid not in app.game_state['connections']:
+        emit('move-response', status_response('This connection is not logged in.'))
+        return
+    if not app.game_state['connections'][sid]['mob']:
+        emit('move-response', status_response('This connection is not assigned to a mob.'))
+        return
+    mob = app.game_state['connections'][sid]['mob']
+
+    x = data['x']
+    y = data['y']
+    dx = abs(mob['position']['x'] - x)
+    dy = abs(mob['position']['y'] - y)
+
+    if dx ** 2 + dy ** 2 > (0.2) ** 2:
+        emit('move-response', status_response('Moving to quickly.'))
+        return
+    app.game_state['connections'][sid]['mob']['position']['x'] = x
+    app.game_state['connections'][sid]['mob']['position']['y'] = y
+    emit('move-response', status_response())
