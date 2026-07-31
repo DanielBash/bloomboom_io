@@ -90,7 +90,8 @@ def create_mob(type, position=(0, 0), name='mob'):
         'type': type,
         'position': {'x': position[0], 'y': position[1]},
         'identity': identity,
-        'name': name
+        'name': name,
+        'rotation': [0, 0, 0],
     }
     return app.game_state['mobs'][identity]
 

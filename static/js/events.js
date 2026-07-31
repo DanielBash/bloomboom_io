@@ -17,6 +17,7 @@ export function event_window_resize() {
     STATE.state.camera.aspect = window.innerWidth / window.innerHeight;
     STATE.state.camera.updateProjectionMatrix();
     STATE.state.renderer.setSize(window.innerWidth, window.innerHeight);
+    STATE.state.label_renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 export function event_keydown(event) {
@@ -111,7 +112,7 @@ function deepUpdate(target, newData, pathPrefix) {
         const oldValue = target[key];
         const eventName = `${pathPrefix}_${key}`;
 
-        if (isPlainObject(newValue) && isPlainObject(oldValue)) {
+        if (isPlainObject(newValue) && isPlainObject(oldValue) && !(eventName === "statechange_world_mobs")) {
             deepUpdate(oldValue, newValue, eventName);
         } else {
             if (oldValue !== newValue) {

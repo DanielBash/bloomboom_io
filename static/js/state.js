@@ -22,7 +22,7 @@ export const settings = {
         background_color: 0x87CEEB,
         fov: 60,
         near: 0.1,
-        far: 1000,
+        far: 500,
         scene_scale: 32,
         render_radius: 11,
         antialias: true,
@@ -69,6 +69,7 @@ export let state = {
     scene_name: "loading",
     connection: null,
     clock: null,
+    label_renderer: null,
     objects: {
         'map': [],
         'mobs': []
@@ -96,7 +97,8 @@ export let state = {
         'shown_map': new Set(),
         'mobs': new Set(),
     },
-    keys_pressed: {}
+    keys_pressed: {},
+    delta: 0.01,
 };
 
 state = new Proxy(state, {

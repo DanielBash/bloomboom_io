@@ -89,6 +89,8 @@ def on_disconnect():
 
     if conn:
         flower = conn['flower']
+        if conn['mob']:
+            del app.game_state['mobs'][conn['mob']['identity']]
         if flower:
             flower_model = get_flower(flower)
             flower_model.is_online = False
@@ -123,6 +125,7 @@ def on_signup(data):
     )
     emit('signup-response', status_response({'username': data['username'], 'password': data['password']}))
 
+
 @socket_io.on('play')
 def on_play():
     sid = request.sid
@@ -131,9 +134,11 @@ def on_play():
         emit('play-response', status_response('This connection is not logged in.'))
         return
 
-    app.game_state['connections'][sid]['mob'] = create_mob('flower', (0, 0), name=app.game_state['connections'][sid]['flower'])
+    app.game_state['connections'][sid]['mob'] = create_mob('flower', (0, 0),
+                                                           name=app.game_state['connections'][sid]['flower'])
     emit('state', state_response(sid, include_map=False, include_personal=True))
     emit('state', status_response({'scene_name': 'game'}))
+
 
 @socket_io.on('move')
 def on_move(data):
@@ -145,16 +150,13 @@ def on_move(data):
     if not app.game_state['connections'][sid]['mob']:
         emit('move-response', status_response('This connection is not assigned to a mob.'))
         return
-    mob = app.game_state['connections'][sid]['mob']
-
+    if 'x' not in data or 'rotation' not in data or 'y' not in data:
+        emit('move-response', status_response('Not enough data specified.'))
+        return
     x = data['x']
     y = data['y']
-    dx = abs(mob['position']['x'] - x)
-    dy = abs(mob['position']['y'] - y)
-
-    if dx ** 2 + dy ** 2 > (0.2) ** 2:
-        emit('move-response', status_response('Moving to quickly.'))
-        return
+    rotation = data['rotation']
     app.game_state['connections'][sid]['mob']['position']['x'] = x
     app.game_state['connections'][sid]['mob']['position']['y'] = y
+    app.game_state['connections'][sid]['mob']['rotation'] = rotation
     emit('move-response', status_response())

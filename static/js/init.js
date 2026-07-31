@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import * as STATE from './state.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 function init_scene(fov, near, far, background_color, antialias, shadow_map_enabled, shadow_map_type) {
     const scene = new THREE.Scene();
@@ -26,6 +27,7 @@ function init_scene(fov, near, far, background_color, antialias, shadow_map_enab
 
     renderer.shadowMap.enabled = shadow_map_enabled;
     renderer.shadowMap.type = shadow_map_type;
+    renderer.domElement.style.zIndex = '9';
     document.body.appendChild(renderer.domElement);
 
     STATE.state.scene = scene;
@@ -36,6 +38,15 @@ function init_scene(fov, near, far, background_color, antialias, shadow_map_enab
     STATE.state.controls.minDistance = 16.0;
     STATE.state.controls.maxDistance = 150.0;
     STATE.state.controls.maxPolarAngle = Math.PI / 2.1;
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    labelRenderer.domElement.style.pointerEvents = 'none'
+    labelRenderer.domElement.style.zIndex = '10';
+    document.body.appendChild(labelRenderer.domElement);
+    STATE.state.label_renderer = labelRenderer;
 }
 
 function init_lighting() {
