@@ -5,7 +5,7 @@
 import {
     event_connect,
     event_connection_login_response,
-    event_connection_signup_response,
+    event_connection_signup_response, event_death,
     event_disconnect,
     event_keydown, event_keyup,
     event_scene_game,
@@ -44,6 +44,7 @@ export const settings = {
         'connection_login-response': event_connection_login_response,
         'connection_signup-response': event_connection_signup_response,
         'connection_state': event_state,
+        'connection_death': event_death,
 
         // - scene events
         'scene_name_login': event_scene_login,
@@ -84,8 +85,8 @@ export let state = {
             'account': {},
             'mob': {
                 'position': {
-                    'x': 0,
-                    'y': 0,
+                    'x': 50,
+                    'y': 50
                 },
                 'identity': null,
             }

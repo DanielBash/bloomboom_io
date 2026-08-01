@@ -100,7 +100,6 @@ function isPlainObject(val) {
 export function event_state(data) {
     const response = data['response'];
     if (!response) return;
-
     deepUpdate(STATE.state.game_state, response, 'statechange');
 }
 
@@ -141,4 +140,10 @@ export function event_world_map() {
     for (let row = 0; row < rows; row++) {
         STATE.state.object_groups.map.push(new Array(cols).fill(null));
     }
+}
+
+
+export function event_death() {
+    STATE.state.scene_name = "lobby";
+    STATE.state.game_state.scene_name = "lobby";
 }

@@ -41,3 +41,7 @@ DEFAULT_PERMISSION_GROUP = 'flower'
 
 # -- gameplay settings
 TPS = 20
+WORLD = "world_1"
+SOLID_BLOCKS = []
+SPAWN_Y = 0
+SPAWN_X = 0

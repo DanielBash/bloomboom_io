@@ -52,51 +52,98 @@ export function create_map(x, y) {
     const instance = clone_model(model);
     const spacing = STATE.settings.graphical.scene_scale;
     const posX = x * spacing;
-    const posY = -1;
+    const posY = 0;
     const posZ = y * spacing;
     instance.position.set(posX, posY, posZ);
     instance.scale.set(spacing, spacing, spacing);
     STATE.state.scene.add(instance);
-    STATE.state.objects['map'].push(instance);
+
+    const key = 'tile_' + x + '_' + y;
+    STATE.state.objects[key] = [instance];
+
+    if (!STATE.state.object_groups.map[y]) {
+        STATE.state.object_groups.map[y] = [];
+    }
     STATE.state.object_groups.map[y][x] = instance;
+
     play_animation(instance, "default", false);
     return instance;
 }
 
 export function hide_map(x, y) {
     const map = STATE.state.object_groups.map;
-    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length && map[y][x] != null) {
-        map[y][x].visible = false;
+    const key = 'tile_' + x + '_' + y;
+
+    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length) {
+        const instance = map[y][x];
+        if (instance) {
+            if (instance.userData && instance.userData.mixer) {
+                instance.userData.mixer.stopAllAction();
+                instance.userData.mixer = null;
+                instance.userData.actions = {};
+            }
+            STATE.state.scene.remove(instance);
+            map[y][x] = null;
+        }
+        if (STATE.state.objects[key]) {
+            delete STATE.state.objects[key];
+        }
     }
     STATE.state.object_groups.shown_map.delete(`${x},${y}`);
 }
 
-export function show_map(x, y) {
-    const map = STATE.state.object_groups['map'];
+export function clear_map() {
+    const objects = STATE.state.objects;
 
-    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length && map[y][x] != null) {
-        map[y][x].visible = true;
-    } else if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length) {
-        create_map(x, y);
+    const tileKeys = Object.keys(objects).filter((k) => k.startsWith('tile_'));
+
+    for (const key of tileKeys) {
+        const arr = objects[key];
+        if (arr) {
+            for (const obj of arr) {
+                if (!obj) continue;
+                if (obj.userData && obj.userData.mixer) {
+                    obj.userData.mixer.stopAllAction();
+                    obj.userData.mixer = null;
+                    obj.userData.actions = {};
+                }
+                STATE.state.scene.remove(obj);
+            }
+        }
+        delete objects[key];
     }
 
-    const shown_map = STATE.state.object_groups['shown_map'];
-    const key = `${x},${y}`;
-    if (!shown_map.has(key)) {
-        shown_map.add(key);
+    if (STATE.state.object_groups) {
+        const ogMap = STATE.state.object_groups['map'];
+        if (ogMap) {
+            for (let y = 0; y < ogMap.length; y++) {
+                if (ogMap[y]) {
+                    for (let x = 0; x < ogMap[y].length; x++) {
+                        ogMap[y][x] = null;
+                    }
+                }
+            }
+        }
+        STATE.state.object_groups['shown_map'] = new Set();
     }
 }
 
-export function clear_map() {
-    const objMap = STATE.state.objects['map'];
+export function show_map(x, y) {
+    const map = STATE.state.object_groups['map'];
+    const key = 'tile_' + x + '_' + y;
 
-    for (let y = 0; y < objMap.length; y++) {
-        STATE.state.scene.remove(objMap[y]);
+    if (map && y >= 0 && y < map.length && x >= 0 && x < map[y].length) {
+        const existing = STATE.state.objects[key];
+        if (existing && existing[0]) {
+        } else {
+            create_map(x, y);
+        }
     }
-    if (STATE.state.object_groups) {
-        STATE.state.object_groups['map'] = [];
-        STATE.state.object_groups['shown_map'] = new Set();
-        STATE.state.objects['map'] = [];
+
+    const shown_map = STATE.state.object_groups['shown_map'];
+    const shownKey = `${x},${y}`;
+    if (!shown_map.has(shownKey)) {
+        shown_map.add(shownKey);
     }
 }
 
@@ -113,28 +160,56 @@ export function create_mob(identity) {
     const data = STATE.state.game_state.world.mobs[identity];
     const instance = clone_model(STATE.state.models[data['type']]);
     const spacing = STATE.settings.graphical.scene_scale;
-
-    instance.scale.set(spacing * 0.5, spacing * 0.5, spacing * 0.5);
+    instance.scale.set(spacing * 0.5 * data['rarity'], spacing * 0.5 * data['rarity'], spacing * 0.5 * data['rarity']);
+    instance.position.set(spacing * data['position']['x'], -1, spacing * data['position']['y'])
 
     STATE.state.objects[identity] = [instance];
     STATE.state.scene.add(STATE.state.objects[identity][0]);
     STATE.state.object_groups.mobs.add(identity);
     play_animation(instance, "default", false);
 
-    if (data['type'] === 'flower') {
-        const username_div = document.createElement('div');
-        username_div.textContent = data['name'] || identity;
-        username_div.style.color = 'white';
-        username_div.style.fontFamily = "'Ubuntu', sans-serif";
-        username_div.style.fontSize = '20px';
-        username_div.style.fontWeight = 'bold';
-        username_div.style.textShadow = '1px 1px 2px black';
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.pointerEvents = 'none';
 
-        const label = new CSS2DObject(username_div);
-        label.name = 'mob_label';
-        STATE.state.scene.add(label);
-        STATE.state.objects[identity].push(label);
-    }
+    const username_div = document.createElement('div');
+    username_div.textContent = data['name'] || identity;
+    username_div.style.color = 'white';
+    username_div.style.fontFamily = "'Ubuntu', sans-serif";
+    username_div.style.fontSize = '20px';
+    username_div.style.fontWeight = 'bold';
+    username_div.style.textShadow = '1px 1px 2px black';
+
+    const health_bar_div = document.createElement('div');
+    health_bar_div.style.width = '60px';
+    health_bar_div.style.height = '6px';
+    health_bar_div.style.backgroundColor = '#333';
+    health_bar_div.style.borderRadius = '3px';
+    health_bar_div.style.overflow = 'hidden';
+    health_bar_div.style.marginTop = '4px';
+
+    const health_div = document.createElement('div');
+    health_div.style.width = '100%';
+    health_div.style.height = '100%';
+    health_div.style.backgroundColor = '#3cb163';
+    health_div.style.transition = 'width 0.2s';
+    health_div.id = 'health-fill-' + identity;
+
+    health_bar_div.appendChild(health_div);
+    container.appendChild(username_div);
+    container.appendChild(health_bar_div);
+
+    health_bar_div.appendChild(health_div);
+    container.appendChild(username_div);
+    container.appendChild(health_bar_div);
+
+    const label = new CSS2DObject(container);
+    label.name = 'mob_label';
+    label.health_bar = health_div;
+    STATE.state.scene.add(label);
+    STATE.state.objects[identity].push(label);
 
     console.log("[INFO] Mob created: " + identity);
 }
@@ -152,35 +227,39 @@ export function update_mob_positions() {
         const model = modelArr[0];
         const tar_z = mob.position.y * spacing;
         const tar_x = mob.position.x * spacing;
+        const tar_y = mob.position.height * spacing;
 
-        // DO NOT lerp the local player. Their position is handled by
-        // client-side prediction in the game loop to prevent stuttering.
-        if (identity !== player_mob_identity) {
-            // Interpolate remote mobs smoothly
-            const lerpFactor = 0.2;
+        const lerpFactor = 0.03;
 
-            const newX = model.position.x + (tar_x - model.position.x) * lerpFactor;
-            const newZ = model.position.z + (tar_z - model.position.z) * lerpFactor;
+        const newX = model.position.x + (tar_x - model.position.x) * lerpFactor;
+        const newZ = model.position.z + (tar_z - model.position.z) * lerpFactor;
+        const newY = model.position.y + (tar_y - model.position.y) * lerpFactor;
 
-            model.position.set(newX, -1, newZ);
-
-            // Smooth rotation
+        model.position.set(newX, newY, newZ);
+        if (!(identity === player_mob_identity)) {
             model.rotation.x = mob.rotation[0];
-            model.rotation.y += (mob.rotation[1] - model.rotation.y) * lerpFactor;
+            model.rotation.y = mob.rotation[1];
             model.rotation.z = mob.rotation[2];
-        } else {
-            // For the local player, just ensure Y is locked.
-            // X and Z are controlled strictly by loop_update_player_movement_controls
-            model.position.y = -1;
         }
 
-        // Update label/name tag position
         if (modelArr.length > 1) {
             modelArr[1].position.set(
                 model.position.x,
-                spacing * 0.5,
+                spacing * 0.7 + model.position.y,
                 model.position.z,
             );
+
+            const percent = Math.max(0, Math.min(100, (mob.health / mob.max_health) * 100));
+
+            modelArr[1].health_bar.style.width = percent + '%';
+
+            if (percent > 60) {
+                modelArr[1].health_bar.style.backgroundColor = '#3CB163FF';
+            } else if (percent > 30) {
+                modelArr[1].health_bar.style.backgroundColor = '#ba9c38';
+            } else {
+                modelArr[1].health_bar.style.backgroundColor = '#bf443a';
+            }
         }
     });
 }

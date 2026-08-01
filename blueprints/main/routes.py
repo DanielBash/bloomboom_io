@@ -10,3 +10,7 @@ bp = Blueprint('main', __name__)
 @bp.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
+
+@bp.route('/editor', methods=['GET'])
+def editor():
+    return render_template('editor.html')

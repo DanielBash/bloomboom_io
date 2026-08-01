@@ -1,4 +1,5 @@
 """Socketio game i/o."""
+import math
 
 # -- importing modules
 from flask import current_app as app
@@ -134,11 +135,13 @@ def on_play():
         emit('play-response', status_response('This connection is not logged in.'))
         return
 
-    app.game_state['connections'][sid]['mob'] = create_mob('flower', (0, 0),
+    app.game_state['connections'][sid]['mob'] = create_mob(type='flower', position={'x': settings.SPAWN_X, 'y': settings.SPAWN_Y, 'height': 0},
                                                            name=app.game_state['connections'][sid]['flower'])
+    identity = app.game_state['connections'][sid]['mob']['identity']
+    app.game_state['mobs'][identity]['connection_sid'] = sid
     emit('state', state_response(sid, include_map=False, include_personal=True))
     emit('state', status_response({'scene_name': 'game'}))
-
+    create_mob(type='ladybug', position={'x': settings.SPAWN_X, 'y': settings.SPAWN_Y, 'height': 0}, name='ladybug', rarity=3)
 
 @socket_io.on('move')
 def on_move(data):
@@ -155,7 +158,10 @@ def on_move(data):
         return
     x = data['x']
     y = data['y']
+    tile_standing = app.game_state['map'][math.floor(y + 0.5)][math.floor(x + 0.5)]
     rotation = data['rotation']
+    if tile_standing in settings.SOLID_BLOCKS:
+        return
     app.game_state['connections'][sid]['mob']['position']['x'] = x
     app.game_state['connections'][sid]['mob']['position']['y'] = y
     app.game_state['connections'][sid]['mob']['rotation'] = rotation

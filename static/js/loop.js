@@ -5,9 +5,8 @@ import * as STATE from "./state.js";
 import * as THREE from 'three';
 import {create_mob, hide_map, remove_mob, show_map, update_mob_positions} from "./utils.js";
 
-// Network throttling variables
 let last_move_emit_time = 0;
-const MOVE_EMIT_INTERVAL = 0.1; // Emit movement to server 10 times per second
+const MOVE_EMIT_INTERVAL = 0.05;
 
 function loop_render() {
     STATE.state.renderer.render(STATE.state.scene, STATE.state.camera);
@@ -37,8 +36,6 @@ function loop_update_fog() {
 
     const spacing = STATE.settings.graphical.scene_scale;
 
-    // Calculate grid position based on the VISUAL 3D model position.
-    // This prevents desync with the delayed network state.
     const px = Math.floor(modelArr[0].position.x / spacing);
     const py = Math.floor(modelArr[0].position.z / spacing);
 
@@ -46,7 +43,6 @@ function loop_update_fog() {
     const shown_map = STATE.state.object_groups['shown_map'];
     const shown_set = new Set();
 
-    // Show maps within radius
     for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
             const x = px + dx;
@@ -59,7 +55,6 @@ function loop_update_fog() {
         }
     }
 
-    // Hide maps out of radius (Safe iteration to avoid mutating Set while iterating)
     const keys_to_hide = [];
     for (const key of shown_map) {
         if (!shown_set.has(key)) {
@@ -82,13 +77,12 @@ function loop_update_camera_controls() {
     const flowerModel = STATE.state.objects[player_mob_identity][0];
     const target = STATE.state.controls.target;
 
-    // Hard snap camera to target to keep player perfectly centered
     const deltaX = flowerModel.position.x - target.x;
     const deltaZ = flowerModel.position.z - target.z;
 
     target.x += deltaX;
-    target.y = 0;
     target.z += deltaZ;
+    target.y = flowerModel.position.y
 
     STATE.state.camera.position.x += deltaX;
     STATE.state.camera.position.z += deltaZ;
@@ -120,27 +114,26 @@ export function loop_update_player_movement_controls() {
     }
 
     const player_mob_identity = STATE.state.game_state.flower.mob.identity;
+    const player_data = STATE.state.game_state.world.mobs[player_mob_identity];
     const modelArr = STATE.state.objects[player_mob_identity];
 
     if (modelArr && modelArr[0]) {
         const model = modelArr[0];
         const cam = STATE.state.camera.position;
-        const spacing = STATE.settings.graphical.scene_scale;
-        const speed = 5;
+        const speed = 10;
         const delta = STATE.state.delta;
 
-        model.position.x += dx * speed * delta * spacing;
-        model.position.z += dz * speed * delta * spacing;
-        model.position.y = -1;
+        const new_x = player_data.position.x + dx * speed * delta;
+        const new_y = player_data.position.y + dz * speed * delta;
 
-        model.lookAt(cam.x, -1, cam.z);
+        model.lookAt(cam.x, model.position.y, cam.z);
 
         if (STATE.state.clock.elapsedTime - last_move_emit_time >= MOVE_EMIT_INTERVAL) {
             last_move_emit_time = STATE.state.clock.elapsedTime;
 
             STATE.state.connection.emit('move', {
-                'x': model.position.x / spacing,
-                'y': model.position.z / spacing,
+                'x': new_x,
+                'y': new_y,
                 'rotation': [model.rotation.x, model.rotation.y, model.rotation.z]
             });
         }

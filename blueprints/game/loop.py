@@ -16,7 +16,7 @@ def game_loop(app):
     while True:
         start = time.perf_counter()
 
-        game_tick()
+        game_tick(app)
 
         socket_io.emit(
             "state",
@@ -26,6 +26,5 @@ def game_loop(app):
                 }
             }),
         )
-
         elapsed = time.perf_counter() - start
         socket_io.sleep(max(0, tick_time - elapsed))

@@ -9,6 +9,7 @@ from core.logger import log
 from werkzeug.security import generate_password_hash, check_password_hash
 from .models import Flower, db
 from flask import current_app as app
+from . import mobs
 
 def create_app(name):
     from .flask_shortcuts import initialize_app
@@ -62,6 +63,7 @@ def get_flower(username):
     return flower
 
 def init_game():
+    import worlds
     app.game_state = {
         'mobs': {},
         'map': [],
@@ -71,29 +73,51 @@ def init_game():
     for i in Path('static/models').iterdir():
         app.game_state['models'].append(i.stem)
 
-    for row in range(200):
-        row = []
-        for column in range(200):
-            if random.randint(1, 50) == 1:
-                if random.randint(0, 1) == 1:
-                    row.append(f'tree_0')
-                else:
-                    row.append(f'water')
+    world = settings.WORLD
+    world_module = getattr(worlds, world)
+    app.game_state['map'] = world_module.MAP
+    settings.SOLID_BLOCKS = world_module.SOLID_TILES
+    settings.SPAWN_Y = world_module.SPAWN_Y
+    settings.SPAWN_X = world_module.SPAWN_X
+
+def create_mob(**kwargs):
+    if 'type' not in kwargs:
+        kwargs['type'] = 'mob'
+    mob = getattr(mobs, kwargs['type'].capitalize(), mobs.Mob).spawn(**kwargs)
+    app.game_state['mobs'][mob['identity']] = mob
+    return mob
+
+def tick_mobs(app):
+    if not hasattr(app, 'mob_instances'):
+        app.mob_instances = {}
+
+    current_mobs = app.game_state['mobs']
+
+    for mob_id, mob_data in current_mobs.items():
+        if mob_id not in app.mob_instances:
+            mob_type = mob_data.get('type', 'default')
+            MobClass = getattr(mobs, mob_type.capitalize(), None)
+            if MobClass:
+                app.mob_instances[mob_id] = MobClass(mob_data, app.game_state)
             else:
-                row.append(f'ground_{random.randint(0, 3)}')
-        app.game_state['map'].append(row)
+                MobClass = getattr(mobs, 'Mob', None)
+                app.mob_instances[mob_id] = MobClass(mob_data, app.game_state)
+        app.mob_instances[mob_id].update()
 
+    dead_mobs = [mob_id for mob_id in app.mob_instances if mob_id not in current_mobs]
+    for mob_id in dead_mobs:
+        del app.mob_instances[mob_id]
 
-def create_mob(type, position=(0, 0), name='mob'):
-    identity = secrets.token_urlsafe(16)
-    app.game_state['mobs'][identity] = {
-        'type': type,
-        'position': {'x': position[0], 'y': position[1]},
-        'identity': identity,
-        'name': name,
-        'rotation': [0, 0, 0],
-    }
-    return app.game_state['mobs'][identity]
+def tick_deaths(app):
+    to_delete = []
+    for mob in app.game_state['mobs'].values():
+        if mob['health'] <= 0:
+            if mob['type'] == 'flower':
+                app.socket_io.emit('death', to=mob['connection_sid'])
+            to_delete.append(mob['identity'])
+    for identity in to_delete:
+        del app.game_state['mobs'][identity]
 
-def game_tick():
-    pass
+def game_tick(app):
+    tick_mobs(app)
+    tick_deaths(app)

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tile Editor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #ddd; overflow: hidden; user-select: none; }
+.hidden { display: none !important; }
+
+button {
+  padding: 6px 12px; background: #2a2a2a; color: #ddd;
+  border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+button:hover { background: #3a3a3a; }
+button:active { background: #1a1a1a; }
+button.active { background: #4a6a9a; border-color: #6a8aba; color: #fff; }
+
+input[type="text"], input[type="number"], textarea {
+  background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  padding: 6px; border-radius: 4px; font-family: inherit; font-size: 13px;
+}
+input[type="number"] { width: 70px; }
+
+input[type="color"] {
+  -webkit-appearance: none; appearance: none;
+  border: 1px solid #555; width: 40px; height: 22px;
+  background: none; cursor: pointer; padding: 0; border-radius: 3px;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+#initial-screen {
+  display: flex; flex-direction: column; gap: 16px;
+  align-items: center; justify-content: center; height: 100vh;
+}
+#initial-screen h1 { font-weight: 500; }
+
+.dialog {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: #222; padding: 20px; border-radius: 8px;
+  border: 1px solid #444; z-index: 100; min-width: 300px;
+}
+.dialog h3 { margin-bottom: 12px; }
+.dialog label { display: block; margin: 8px 0; }
+.dialog textarea {
+  display: block; width: 500px; max-width: 80vw; height: 250px;
+  font-family: monospace; font-size: 12px;
+}
+.dialog .row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+
+#editor { display: flex; width: 100vw; height: 100vh; }
+#canvas-wrapper { flex: 1; position: relative; overflow: hidden; background: #0a0a0a; }
+#canvas { display: block; }
+
+#cursor-pos {
+  position: absolute; bottom: 10px; left: 10px;
+  background: rgba(0, 0, 0, 0.7); color: #0f0;
+  padding: 4px 8px; border-radius: 4px;
+  font-family: monospace; font-size: 12px; pointer-events: none;
+  border: 1px solid #333;
+}
+
+#sidebar {
+  width: 260px; background: #222; border-left: 1px solid #333;
+  padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
+}
+
+.section { background: #2a2a2a; border: 1px solid #333; border-radius: 4px; padding: 8px; }
+.section h3 {
+  font-size: 11px; text-transform: uppercase; color: #888;
+  margin-bottom: 6px; letter-spacing: 0.5px;
+}
+
+.tile-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 300px; overflow-y: auto; }
+.tile-item {
+  display: flex; flex-direction: column; align-items: center; width: 74px; padding: 4px;
+  background: #1a1a1a; border: 1px solid #3a3a3a; border-radius: 4px; cursor: pointer;
+  transition: border-color 0.1s;
+}
+.tile-item:hover { border-color: #888; }
+.tile-swatch { width: 58px; height: 58px; background: #333; display: block; border-radius: 2px; }
+.tile-name {
+  font-size: 11px; text-align: center; margin-top: 4px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;
+}
+.tile-actions {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 4px; width: 58px;
+}
+.tile-actions .row1 {
+  display: flex; gap: 4px; align-items: center; justify-content: space-between;
+}
+.tile-actions button { padding: 2px 0; font-size: 10px; min-width: 20px; flex: 1; }
+
+input[type="range"] { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; }
+.hint { font-size: 10px; color: #777; margin-top: 4px; line-height: 1.4; }
+#brush-size-display { color: #fff; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="initial-screen">
+  <h1>Tile Editor</h1>
+  <button id="create-btn">Create New Tilemap</button>
+  <button id="load-btn">Load Existing Tilemap</button>
+  <button id="continue-btn" class="hidden">Continue Last Session</button>
+</div>
+
+<div id="create-dialog" class="dialog hidden">
+  <h3>Create New Tilemap</h3>
+  <label>Width: <input id="create-width" type="number" value="20" min="1"></label>
+  <label>Height: <input id="create-height" type="number" value="15" min="1"></label>
+  <label>Default tile name: <input id="create-default" type="text" value="empty"></label>
+  <div class="row">
+    <button id="create-confirm">Create</button>
+    <button id="create-cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="load-dialog" class="dialog hidden">
+  <h3>Load Tilemap</h3>
+  <p style="font-size:12px;color:#888;margin-bottom:8px;">Paste Python variables (MAP, SOLID_TILES, etc.) or just a 2D array:</p>
+  <textarea id="load-input" placeholder='MAP = [["grass", "water"], ["grass", "grass"]]' style="height: 150px;"></textarea>
+  <div class="row">
+    <button id="load-confirm">Load</button>
+    <button id="load-cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="editor" class="hidden">
+  <div id="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+    <div id="cursor-pos">X: 0, Y: 0</div>
+  </div>
+  <div id="sidebar">
+    <div class="section">
+      <h3>Brush Size: <span id="brush-size-display">1</span></h3>
+      <input type="range" id="brush-size" min="1" max="20" value="1">
+    </div>
+    <div class="section">
+      <h3>Brush Tiles (random pick)</h3>
+      <div id="brush-list" class="tile-list"></div>
+      <p class="hint">Click palette tile to add. Click here to remove.</p>
+    </div>
+    <div class="section">
+      <h3>Tile Palette</h3>
+      <div id="palette" class="tile-list"></div>
+      <div style="margin-top:6px;"><button id="add-tile-btn">+ Add Tile</button></div>
+      <p class="hint">Use color box to pick.<br>R = randomize color.</p>
+    </div>
+    <div class="section">
+      <h3>Tools</h3>
+      <button id="spawn-btn" style="width:100%;">Set Spawn Position</button>
+      <p class="hint">Click to activate, then click map.</p>
+    </div>
+    <div class="section">
+      <h3>View</h3>
+      <div class="row">
+        <button id="fit-btn">Fit</button>
+        <button id="new-btn">New</button>
+      </div>
+      <p class="hint">Wheel = zoom<br>Middle-drag or Space+drag = pan</p>
+    </div>
+    <div class="section">
+      <h3>Export</h3>
+      <button id="save-btn" style="width:100%;">Save as Python Variables</button>
+    </div>
+  </div>
+</div>
+
+<div id="save-dialog" class="dialog hidden">
+  <h3>Python Code</h3>
+  <textarea id="save-output" readonly style="height: 350px;"></textarea>
+  <div class="row">
+    <button id="save-copy">Copy to Clipboard</button>
+    <button id="save-close">Close</button>
+  </div>
+</div>
+
+<div id="add-tile-dialog" class="dialog hidden">
+  <h3>Add New Tile</h3>
+  <label>Name: <input id="new-tile-name" type="text"></label>
+  <div class="row">
+    <button id="add-tile-confirm">Add</button>
+    <button id="add-tile-cancel">Cancel</button>
+  </div>
+</div>
+
+<script>
+const state = {
+  tilemap: [], width: 0, height: 0,
+  tiles: {}, // name -> { color: string, solid: boolean }
+  brushTiles: [], brushSize: 1,
+  scale: 32, cameraX: 0, cameraY: 0,
+  hoverX: undefined, hoverY: undefined,
+  spawnX: 0, spawnY: 0,
+  spawnSelectMode: false
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('canvas-wrapper');
+const cursorPosDiv = document.getElementById('cursor-pos');
+const dpr = window.devicePixelRatio || 1;
+
+// ===== Python array parser =====
+function parsePythonArray(str) {
+  const tokens = [];
+  let i = 0; const n = str.length;
+  while (i < n) {
+    const c = str[i];
+    if (c === '[' || c === ']' || c === ',') { tokens.push(c); i++; }
+    else if (c === '"' || c === "'") {
+      const q = c; i++; let s = '';
+      while (i < n && str[i] !== q) {
+        if (str[i] === '\\' && i + 1 < n) { s += str[i + 1]; i += 2; }
+        else { s += str[i]; i++; }
+      }
+      i++; tokens.push({ type: 'string', value: s });
+    } else if (/\s/.test(c)) { i++; }
+    else {
+      let id = '';
+      while (i < n && !'[], \t\n\r"\''.includes(str[i])) { id += str[i]; i++; }
+      if (id) tokens.push({ type: 'string', value: id });
+    }
+  }
+  let pos = 0;
+  function parseVal() {
+    const t = tokens[pos];
+    if (t === '[') {
+      pos++; const arr = [];
+      while (tokens[pos] !== ']') {
+        if (tokens[pos] === ',') { pos++; continue; }
+        if (pos >= tokens.length) throw new Error('Unexpected end');
+        arr.push(parseVal());
+      }
+      pos++; return arr;
+    } else if (t && t.type === 'string') { pos++; return t.value; }
+    else throw new Error('Unexpected token');
+  }
+  const result = parseVal();
+  if (!Array.isArray(result) || result.length === 0 || !Array.isArray(result[0]))
+    throw new Error('Not a 2D array');
+  const w = result[0].length;
+  if (w === 0) throw new Error('Empty rows');
+  for (const row of result)
+    if (!Array.isArray(row) || row.length !== w) throw new Error('Not rectangular');
+  return result;
+}
+
+// Parses the custom output format containing SOLID_TILES, MAP, SPAWN_X, SPAWN_Y
+function parsePythonState(str) {
+  let mapStr = str;
+  let solidTiles = [];
+  let spawnX = 0, spawnY = 0;
+
+  const mapMatch = str.match(/MAP\s*=\s*(\[[\s\S]*\])/);
+  if (mapMatch) mapStr = mapMatch[1];
+
+  const solidMatch = str.match(/SOLID_TILES\s*=\s*(\[[\s\S]*?\])/);
+  if (solidMatch) {
+    try { solidTiles = parsePythonArray(solidMatch[1]); } catch(e) {}
+  }
+
+  const xMatch = str.match(/SPAWN_X\s*=\s*(-?\d+)/);
+  if (xMatch) spawnX = parseInt(xMatch[1]);
+
+  const yMatch = str.match(/SPAWN_Y\s*=\s*(-?\d+)/);
+  if (yMatch) spawnY = parseInt(yMatch[1]);
+
+  const map = parsePythonArray(mapStr);
+  return { map, solidTiles, spawnX, spawnY };
+}
+
+// ===== LocalStorage =====
+function saveState() {
+  try {
+    const data = {
+      tilemap: state.tilemap,
+      width: state.width,
+      height: state.height,
+      tiles: state.tiles,
+      brushTiles: state.brushTiles,
+      brushSize: state.brushSize,
+      spawnX: state.spawnX,
+      spawnY: state.spawnY
+    };
+    localStorage.setItem('tileEditorData', JSON.stringify(data));
+  } catch(e) { console.error("Save failed", e); }
+}
+
+function loadState() {
+  try {
+    const data = JSON.parse(localStorage.getItem('tileEditorData'));
+    if (!data || !data.tilemap) return false;
+    state.tilemap = data.tilemap;
+    state.width = data.width;
+    state.height = data.height;
+    state.tiles = data.tiles;
+    state.brushTiles = data.brushTiles || [];
+    state.brushSize = data.brushSize || 1;
+    state.spawnX = data.spawnX || 0;
+    state.spawnY = data.spawnY || 0;
+    return true;
+  } catch(e) { return false; }
+}
+
+// ===== Helpers =====
+function randomColor() {
+  return '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+}
+
+function drawTileToCanvas(c, name, x, y, size) {
+  const tile = state.tiles[name];
+  c.fillStyle = tile ? tile.color : '#333';
+  c.fillRect(x, y, size, size);
+  if (size >= 10) {
+    c.fillStyle = 'rgba(255,255,255,0.9)';
+    c.font = `bold ${Math.floor(size * 0.6)}px sans-serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText((name[0] || '?').toUpperCase(), x + size / 2, y + size / 2 + 1);
+  }
+}
+
+// ===== Rendering =====
+function resizeCanvas() {
+  const w = wrapper.clientWidth, h = wrapper.clientHeight;
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  render();
+}
+
+function render() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, cw, ch);
+
+  if (state.width === 0 || state.height === 0) return;
+
+  const ts = state.scale;
+  const sx = Math.max(0, Math.floor(state.cameraX));
+  const sy = Math.max(0, Math.floor(state.cameraY));
+  const ex = Math.min(state.width, Math.ceil(state.cameraX + cw / ts) + 1);
+  const ey = Math.min(state.height, Math.ceil(state.cameraY + ch / ts) + 1);
+
+  for (let y = sy; y < ey; y++) {
+    for (let x = sx; x < ex; x++) {
+      const name = state.tilemap[y][x];
+      if (name == null) continue;
+      const px = Math.floor((x - state.cameraX) * ts);
+      const py = Math.floor((y - state.cameraY) * ts);
+      drawTileToCanvas(ctx, name, px, py, ts);
+    }
+  }
+
+  // Grid lines
+  if (ts >= 8) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const gx0 = Math.max(sx, Math.floor(state.cameraX));
+    const gx1 = Math.min(ex, Math.ceil(state.cameraX + cw / ts));
+    const gy0 = Math.max(sy, Math.floor(state.cameraY));
+    const gy1 = Math.min(ey, Math.ceil(state.cameraY + ch / ts));
+    for (let x = gx0; x <= gx1; x++) {
+      const px = Math.floor((x - state.cameraX) * ts) + 0.5;
+      ctx.moveTo(px, Math.max(0, (gy0 - state.cameraY) * ts));
+      ctx.lineTo(px, Math.min(ch, (gy1 - state.cameraY) * ts));
+    }
+    for (let y = gy0; y <= gy1; y++) {
+      const py = Math.floor((y - state.cameraY) * ts) + 0.5;
+      ctx.moveTo(Math.max(0, (gx0 - state.cameraX) * ts), py);
+      ctx.lineTo(Math.min(cw, (gx1 - state.cameraX) * ts), py);
+    }
+    ctx.stroke();
+  }
+
+  // Map boundary
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(
+    (0 - state.cameraX) * ts, (0 - state.cameraY) * ts,
+    state.width * ts, state.height * ts
+  );
+
+  // Spawn position highlight
+  if (state.spawnX !== undefined && state.spawnX !== null) {
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = Math.max(2, ts / 8);
+    ctx.strokeRect(
+      (state.spawnX - state.cameraX) * ts + 2,
+      (state.spawnY - state.cameraY) * ts + 2,
+      ts - 4, ts - 4
+    );
+  }
+
+  // Brush preview
+  if (state.hoverX !== undefined && state.brushTiles.length > 0 && !state.spawnSelectMode) {
+    const half = Math.floor(state.brushSize / 2);
+    ctx.strokeStyle = 'rgba(255,255,0,0.9)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      (state.hoverX - half - state.cameraX) * ts,
+      (state.hoverY - half - state.cameraY) * ts,
+      state.brushSize * ts, state.brushSize * ts
+    );
+  }
+}
+
+// ===== Painting =====
+function paintAt(tx, ty) {
+  if (state.brushTiles.length === 0) return;
+  const half = Math.floor(state.brushSize / 2);
+  for (let dy = 0; dy < state.brushSize; dy++) {
+    for (let dx = 0; dx < state.brushSize; dx++) {
+      const x = tx - half + dx, y = ty - half + dy;
+      if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
+        const idx = Math.floor(Math.random() * state.brushTiles.length);
+        state.tilemap[y][x] = state.brushTiles[idx];
+      }
+    }
+  }
+}
+
+function paintLine(x0, y0, x1, y1) {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy, x = x0, y = y0;
+  while (true) {
+    paintAt(x, y);
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+}
+
+// ===== Input =====
+let isPanning = false, isPainting = false, panStart = null, lastPaintPos = null, spaceHeld = false;
+
+function screenToTile(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  return { tx: Math.floor(state.cameraX + mx / state.scale), ty: Math.floor(state.cameraY + my / state.scale) };
+}
+
+function updateCursor() {
+  if (state.spawnSelectMode) canvas.style.cursor = 'crosshair';
+  else canvas.style.cursor = isPanning ? 'grabbing' : (spaceHeld ? 'grab' : 'crosshair');
+}
+
+canvas.addEventListener('mousedown', e => {
+  const { tx, ty } = screenToTile(e);
+
+  if (state.spawnSelectMode && e.button === 0) {
+    state.spawnX = tx;
+    state.spawnY = ty;
+    state.spawnSelectMode = false;
+    document.getElementById('spawn-btn').classList.remove('active');
+    saveState();
+    render();
+    return;
+  }
+
+  if (e.button === 1 || (e.button === 0 && spaceHeld)) {
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY, camX: state.cameraX, camY: state.cameraY };
+    e.preventDefault();
+  } else if (e.button === 0 && state.brushTiles.length > 0) {
+    isPainting = true;
+    lastPaintPos = { x: tx, y: ty };
+    paintAt(tx, ty);
+    render();
+  }
+  updateCursor();
+});
+
+canvas.addEventListener('mousemove', e => {
+  const { tx, ty } = screenToTile(e);
+  state.hoverX = tx; state.hoverY = ty;
+
+  cursorPosDiv.textContent = `X: ${tx}, Y: ${ty}`;
+
+  if (isPanning && panStart) {
+    state.cameraX = panStart.camX - (e.clientX - panStart.x) / state.scale;
+    state.cameraY = panStart.camY - (e.clientY - panStart.y) / state.scale;
+  } else if (isPainting && lastPaintPos) {
+    paintLine(lastPaintPos.x, lastPaintPos.y, tx, ty);
+    lastPaintPos = { x: tx, y: ty };
+  }
+  render();
+});
+
+window.addEventListener('mouseup', () => {
+  if (isPainting) saveState(); // Save map after painting stroke ends
+  isPanning = false; isPainting = false; panStart = null; lastPaintPos = null;
+  updateCursor();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  state.hoverX = undefined; state.hoverY = undefined; render();
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const wx = state.cameraX + mx / state.scale, wy = state.cameraY + my / state.scale;
+  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  state.scale = Math.max(2, Math.min(256, state.scale * factor));
+  state.cameraX = wx - mx / state.scale;
+  state.cameraY = wy - my / state.scale;
+  render();
+}, { passive: false });
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+    spaceHeld = true; e.preventDefault(); updateCursor();
+  }
+});
+document.addEventListener('keyup', e => {
+  if (e.code === 'Space') { spaceHeld = false; updateCursor(); }
+});
+
+window.addEventListener('resize', resizeCanvas);
+
+// ===== UI =====
+const show = id => document.getElementById(id).classList.remove('hidden');
+const hide = id => document.getElementById(id).classList.add('hidden');
+
+// Check for saved session on load
+if (localStorage.getItem('tileEditorData')) {
+  document.getElementById('continue-btn').classList.remove('hidden');
+}
+
+document.getElementById('continue-btn').onclick = () => {
+  if (loadState()) {
+    document.getElementById('brush-size').value = state.brushSize;
+    document.getElementById('brush-size-display').textContent = state.brushSize;
+    startEditor();
+  } else {
+    alert("Failed to load session.");
+  }
+};
+
+document.getElementById('create-btn').onclick = () => show('create-dialog');
+document.getElementById('create-cancel').onclick = () => hide('create-dialog');
+document.getElementById('create-confirm').onclick = () => {
+  const w = Math.max(1, parseInt(document.getElementById('create-width').value) || 1);
+  const h = Math.max(1, parseInt(document.getElementById('create-height').value) || 1);
+  const def = document.getElementById('create-default').value.trim() || 'empty';
+  createTilemap(w, h, def);
+  hide('create-dialog');
+  startEditor();
+};
+
+document.getElementById('load-btn').onclick = () => show('load-dialog');
+document.getElementById('load-cancel').onclick = () => hide('load-dialog');
+document.getElementById('load-confirm').onclick = () => {
+  try {
+    const inputStr = document.getElementById('load-input').value;
+    const { map, solidTiles, spawnX, spawnY } = parsePythonState(inputStr);
+    loadTilemap(map, solidTiles, spawnX, spawnY);
+    hide('load-dialog');
+    startEditor();
+  } catch (e) { alert('Parse error: ' + e.message); }
+};
+
+function createTilemap(w, h, defaultTile) {
+  state.width = w; state.height = h;
+  state.tilemap = [];
+  for (let y = 0; y < h; y++) state.tilemap.push(new Array(w).fill(defaultTile));
+  state.tiles = {};
+  state.tiles[defaultTile] = { color: randomColor(), solid: false };
+  state.brushTiles = [defaultTile];
+  state.brushSize = 1;
+  state.spawnX = 0;
+  state.spawnY = 0;
+  document.getElementById('brush-size').value = 1;
+  document.getElementById('brush-size-display').textContent = 1;
+  saveState();
+}
+
+function loadTilemap(arr, solidTiles = [], spawnX = 0, spawnY = 0) {
+  state.height = arr.length; state.width = arr[0].length;
+  state.tilemap = arr.map(row => row.slice());
+  state.tiles = {};
+  const solidSet = new Set(solidTiles);
+  for (let y = 0; y < state.height; y++) {
+    for (let x = 0; x < state.width; x++) {
+      const name = state.tilemap[y][x];
+      if (name != null && !state.tiles[name]) {
+        state.tiles[name] = { color: randomColor(), solid: solidSet.has(name) };
+      }
+    }
+  }
+  const first = Object.keys(state.tiles)[0];
+  state.brushTiles = first ? [first] : [];
+  state.brushSize = 1;
+  state.spawnX = spawnX;
+  state.spawnY = spawnY;
+  document.getElementById('brush-size').value = 1;
+  document.getElementById('brush-size-display').textContent = 1;
+  saveState();
+}
+
+function startEditor() {
+  hide('initial-screen');
+  show('editor');
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    fitToScreen();
+    renderPalette();
+    renderBrushList();
+    render();
+  });
+}
+
+function fitToScreen() {
+  if (state.width === 0 || state.height === 0) return;
+  const cw = canvas.width / dpr, ch = canvas.height / dpr;
+  state.scale = Math.max(2, Math.min(cw / state.width, ch / state.height) * 0.9);
+  state.cameraX = (state.width - cw / state.scale) / 2;
+  state.cameraY = (state.height - ch / state.scale) / 2;
+  render();
+}
+
+document.getElementById('fit-btn').onclick = fitToScreen;
+document.getElementById('new-btn').onclick = () => {
+  if (confirm('Discard current map and start over?')) {
+    localStorage.removeItem('tileEditorData');
+    location.reload();
+  }
+};
+
+document.getElementById('brush-size').oninput = (e) => {
+  state.brushSize = parseInt(e.target.value);
+  document.getElementById('brush-size-display').textContent = state.brushSize;
+  render();
+};
+
+document.getElementById('spawn-btn').onclick = (e) => {
+  state.spawnSelectMode = !state.spawnSelectMode;
+  e.target.classList.toggle('active', state.spawnSelectMode);
+  updateCursor();
+};
+
+function renderPalette() {
+  const pal = document.getElementById('palette');
+  pal.innerHTML = '';
+  for (const name of Object.keys(state.tiles)) {
+    pal.appendChild(createTileItem(name, () => {
+      if (!state.brushTiles.includes(name)) {
+        state.brushTiles.push(name);
+        renderBrushList();
+      }
+    }, true));
+  }
+}
+
+function renderBrushList() {
+  const list = document.getElementById('brush-list');
+  list.innerHTML = '';
+  for (const name of state.brushTiles) {
+    list.appendChild(createTileItem(name, () => {
+      state.brushTiles = state.brushTiles.filter(t => t !== name);
+      renderBrushList();
+      saveState();
+    }, false));
+  }
+}
+
+function createTileItem(name, onClick, withActions) {
+  const item = document.createElement('div');
+  item.className = 'tile-item';
+  const sw = document.createElement('canvas');
+  sw.width = 58; sw.height = 58; sw.className = 'tile-swatch';
+  drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
+  const lbl = document.createElement('div');
+  lbl.className = 'tile-name'; lbl.textContent = name; lbl.title = name;
+  item.appendChild(sw); item.appendChild(lbl);
+
+  if (withActions) {
+    const acts = document.createElement('div');
+    acts.className = 'tile-actions';
+
+    // Row 1: Color Picker and 'R' Button
+    const row1 = document.createElement('div');
+    row1.className = 'row1';
+
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = state.tiles[name].color;
+    colorInput.title = 'Change color';
+    colorInput.style.flex = 'none';
+    colorInput.style.width = '40px';
+    colorInput.onclick = e => e.stopPropagation();
+    colorInput.oninput = e => {
+      state.tiles[name].color = e.target.value;
+      drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
+      renderBrushList();
+      render();
+      saveState();
+    };
+    row1.appendChild(colorInput);
+
+    const rb = document.createElement('button');
+    rb.textContent = 'R'; rb.title = 'Randomize color';
+    rb.onclick = e => {
+      e.stopPropagation();
+      state.tiles[name].color = randomColor();
+      colorInput.value = state.tiles[name].color;
+      drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
+      renderBrushList();
+      render();
+      saveState();
+    };
+    row1.appendChild(rb);
+    acts.appendChild(row1);
+
+    // Row 2: Solid toggle button
+    const sb = document.createElement('button');
+    sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty';
+    sb.title = 'Toggle Solid';
+    sb.style.width = '100%';
+    sb.style.padding = '3px 0';
+    sb.onclick = e => {
+      e.stopPropagation();
+      state.tiles[name].solid = !state.tiles[name].solid;
+      sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty';
+      saveState();
+    };
+    acts.appendChild(sb);
+
+    item.appendChild(acts);
+  }
+
+  item.onclick = onClick;
+  return item;
+}
+
+document.getElementById('add-tile-btn').onclick = () => {
+  document.getElementById('new-tile-name').value = '';
+  show('add-tile-dialog');
+};
+document.getElementById('add-tile-cancel').onclick = () => hide('add-tile-dialog');
+document.getElementById('add-tile-confirm').onclick = () => {
+  const name = document.getElementById('new-tile-name').value.trim();
+  if (!name) { alert('Tile name required'); return; }
+  if (state.tiles[name]) { alert('Tile already exists'); return; }
+  state.tiles[name] = { color: randomColor(), solid: false };
+  state.brushTiles.push(name);
+  hide('add-tile-dialog');
+  renderPalette(); renderBrushList();
+  saveState();
+};
+
+document.getElementById('save-btn').onclick = () => {
+  const solidTilesStr = Object.keys(state.tiles)
+    .filter(k => state.tiles[k].solid)
+    .map(t => `"${t}"`).join(', ');
+
+  let mapStr = '[\n';
+  for (let y = 0; y < state.height; y++) {
+    mapStr += '  [';
+    for (let x = 0; x < state.width; x++) {
+      const v = String(state.tilemap[y][x]).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      mapStr += '"' + v + '"';
+      if (x < state.width - 1) mapStr += ', ';
+    }
+    mapStr += ']';
+    if (y < state.height - 1) mapStr += ',';
+    mapStr += '\n';
+  }
+  mapStr += ']';
+
+  const output = `SOLID_TILES = [${solidTilesStr}]\n\nMAP = ${mapStr}\nSPAWN_X = ${state.spawnX}\nSPAWN_Y = ${state.spawnY}`;
+
+  document.getElementById('save-output').value = output;
+  show('save-dialog');
+};
+
+document.getElementById('save-close').onclick = () => hide('save-dialog');
+document.getElementById('save-copy').onclick = async () => {
+  const ta = document.getElementById('save-output');
+  const btn = document.getElementById('save-copy');
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    const o = btn.textContent; btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = o, 1500);
+  } catch {
+    ta.select(); document.execCommand('copy');
+  }
+};
+</script>
+</body>
+</html>
