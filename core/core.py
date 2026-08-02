@@ -69,6 +69,7 @@ def init_game():
         'map': [],
         'connections': {},
         'models': [],
+        'delta_time': 1 / settings.TPS
     }
     for i in Path('static/models').iterdir():
         app.game_state['models'].append(i.stem)
@@ -77,15 +78,23 @@ def init_game():
     world_module = getattr(worlds, world)
     app.game_state['map'] = world_module.MAP
     settings.SOLID_BLOCKS = world_module.SOLID_TILES
+    settings.SPAWN_MAP = world_module.SPAWN_MAP
     settings.SPAWN_Y = world_module.SPAWN_Y
     settings.SPAWN_X = world_module.SPAWN_X
 
 def create_mob(**kwargs):
     if 'type' not in kwargs:
         kwargs['type'] = 'mob'
-    mob = getattr(mobs, kwargs['type'].capitalize(), mobs.Mob).spawn(**kwargs)
-    app.game_state['mobs'][mob['identity']] = mob
-    return mob
+    if 'app' in kwargs:
+        _app = kwargs['app']
+        del kwargs['app']
+        mob = getattr(mobs, kwargs['type'].capitalize(), mobs.Mob).spawn(**kwargs)
+        _app.game_state['mobs'][mob['identity']] = mob
+        return mob
+    else:
+        mob = getattr(mobs, kwargs['type'].capitalize(), mobs.Mob).spawn(**kwargs)
+        app.game_state['mobs'][mob['identity']] = mob
+        return mob
 
 def tick_mobs(app):
     if not hasattr(app, 'mob_instances'):
@@ -118,6 +127,48 @@ def tick_deaths(app):
     for identity in to_delete:
         del app.game_state['mobs'][identity]
 
+def tick_spawns(app):
+    spawn_map = settings.SPAWN_MAP
+    rows = len(spawn_map)
+    cols = len(spawn_map[0]) if rows > 0 else 0
+
+    if not hasattr(app, 'spawn_timers'):
+        app.spawn_timers = [[0.0] * cols for _ in range(rows)]
+
+    for _ in range(settings.ITERATE_THROUGH):
+        row = random.randint(0, rows - 1)
+        col = random.randint(0, cols - 1)
+
+        tile = spawn_map[row][col]
+        if not tile:
+            continue
+
+        app.spawn_timers[row][col] += app.game_state['delta_time']
+
+        if app.spawn_timers[row][col] > settings.SERVER_MOB_DELAY and len(app.game_state['mobs'].keys()) < settings.SERVER_MOB_LIMIT:
+            app.spawn_timers[row][col] = 0.0
+
+            types = tile
+            type_weights = [entry['chance'] for entry in types]
+            chosen_type = random.choices(types, weights=type_weights, k=1)[0]
+
+            rarities = chosen_type['rarities']
+            rarity_weights = [r['chance'] for r in rarities]
+            chosen_rarity = random.choices(rarities, weights=rarity_weights, k=1)[0]
+
+            create_mob(
+                position={
+                    'x': col + random.random() - 0.5,
+                    'y': row + random.random() - 0.5,
+                    'height': 0
+                },
+                type=chosen_type['type'],
+                rarity=chosen_rarity['rarity'],
+                app=app
+            )
+
+
 def game_tick(app):
     tick_mobs(app)
     tick_deaths(app)
+    tick_spawns(app)

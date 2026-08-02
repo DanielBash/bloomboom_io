@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tile Editor</title>
+<title>Tile & Spawn Editor</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #ddd; overflow: hidden; user-select: none; }
@@ -15,8 +15,10 @@ button {
 button:hover { background: #3a3a3a; }
 button:active { background: #1a1a1a; }
 button.active { background: #4a6a9a; border-color: #6a8aba; color: #fff; }
+button.danger { background: #4a2a2a; border-color: #6a3a3a; color: #ddd; }
+button.danger.active { background: #8a3a3a; border-color: #aa5a5a; color: #fff; }
 
-input[type="text"], input[type="number"], textarea {
+input[type="text"], input[type="number"], textarea, select {
   background: #1a1a1a; color: #ddd; border: 1px solid #444;
   padding: 6px; border-radius: 4px; font-family: inherit; font-size: 13px;
 }
@@ -39,7 +41,7 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 .dialog {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   background: #222; padding: 20px; border-radius: 8px;
-  border: 1px solid #444; z-index: 100; min-width: 300px;
+  border: 1px solid #444; z-index: 100; min-width: 300px; max-height: 90vh; overflow-y: auto;
 }
 .dialog h3 { margin-bottom: 12px; }
 .dialog label { display: block; margin: 8px 0; }
@@ -50,6 +52,12 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
 .dialog .row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
 
 #editor { display: flex; width: 100vw; height: 100vh; }
+
+#sidebar {
+  width: 280px; background: #222; border-right: 1px solid #333;
+  padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
+}
+
 #canvas-wrapper { flex: 1; position: relative; overflow: hidden; background: #0a0a0a; }
 #canvas { display: block; }
 
@@ -58,12 +66,8 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
   background: rgba(0, 0, 0, 0.7); color: #0f0;
   padding: 4px 8px; border-radius: 4px;
   font-family: monospace; font-size: 12px; pointer-events: none;
-  border: 1px solid #333;
-}
-
-#sidebar {
-  width: 260px; background: #222; border-left: 1px solid #333;
-  padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
+  border: 1px solid #333; max-width: calc(100% - 20px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .section { background: #2a2a2a; border: 1px solid #333; border-radius: 4px; padding: 8px; }
@@ -71,6 +75,9 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
   font-size: 11px; text-transform: uppercase; color: #888;
   margin-bottom: 6px; letter-spacing: 0.5px;
 }
+
+.mode-switch { display: flex; gap: 4px; }
+.mode-switch button { flex: 1; padding: 8px 0; font-weight: bold; }
 
 .tile-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 300px; overflow-y: auto; }
 .tile-item {
@@ -91,17 +98,30 @@ input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
   display: flex; gap: 4px; align-items: center; justify-content: space-between;
 }
 .tile-actions button { padding: 2px 0; font-size: 10px; min-width: 20px; flex: 1; }
+.tile-actions .weight-input { font-size: 10px; padding: 2px; width: 100%; text-align: center; }
 
 input[type="range"] { width: 100%; }
 .row { display: flex; gap: 8px; align-items: center; }
 .hint { font-size: 10px; color: #777; margin-top: 4px; line-height: 1.4; }
 #brush-size-display { color: #fff; font-weight: bold; }
+
+/* Edit Spawns Dialog Styles */
+.edit-spawn-block {
+  border: 1px solid #444; padding: 8px; margin-bottom: 8px; background: #1a1a1a; border-radius: 4px;
+}
+.edit-spawn-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: bold;
+}
+.rarity-row {
+  display: flex; gap: 5px; align-items: center; margin-top: 4px; font-size: 12px;
+}
+.rarity-row input { width: 60px; padding: 4px; }
 </style>
 </head>
 <body>
 
 <div id="initial-screen">
-  <h1>Tile Editor</h1>
+  <h1>Tile & Spawn Editor</h1>
   <button id="create-btn">Create New Tilemap</button>
   <button id="load-btn">Load Existing Tilemap</button>
   <button id="continue-btn" class="hidden">Continue Last Session</button>
@@ -120,8 +140,8 @@ input[type="range"] { width: 100%; }
 
 <div id="load-dialog" class="dialog hidden">
   <h3>Load Tilemap</h3>
-  <p style="font-size:12px;color:#888;margin-bottom:8px;">Paste Python variables (MAP, SOLID_TILES, etc.) or just a 2D array:</p>
-  <textarea id="load-input" placeholder='MAP = [["grass", "water"], ["grass", "grass"]]' style="height: 150px;"></textarea>
+  <p style="font-size:12px;color:#888;margin-bottom:8px;">Paste Python variables (MAP, SOLID_TILES, SPAWN_MAP, etc.) or just a 2D array:</p>
+  <textarea id="load-input" placeholder='MAP = [["grass", "water"]...]' style="height: 150px;"></textarea>
   <div class="row">
     <button id="load-confirm">Load</button>
     <button id="load-cancel">Cancel</button>
@@ -129,30 +149,59 @@ input[type="range"] { width: 100%; }
 </div>
 
 <div id="editor" class="hidden">
-  <div id="canvas-wrapper">
-    <canvas id="canvas"></canvas>
-    <div id="cursor-pos">X: 0, Y: 0</div>
-  </div>
   <div id="sidebar">
+    <div class="section">
+      <div class="mode-switch">
+        <button id="mode-tiles" class="active">Paint Tiles</button>
+        <button id="mode-spawns">Paint Spawns</button>
+        <button id="mode-edit">Edit Spawns</button>
+      </div>
+    </div>
+
     <div class="section">
       <h3>Brush Size: <span id="brush-size-display">1</span></h3>
       <input type="range" id="brush-size" min="1" max="20" value="1">
     </div>
-    <div class="section">
-      <h3>Brush Tiles (random pick)</h3>
-      <div id="brush-list" class="tile-list"></div>
-      <p class="hint">Click palette tile to add. Click here to remove.</p>
+
+    <!-- Tile Mode Sections -->
+    <div class="tile-mode-only">
+      <div class="section">
+        <h3>Tile Brush (random pick)</h3>
+        <div id="brush-list" class="tile-list"></div>
+        <p class="hint">Click palette tile to add. Click here to remove.</p>
+      </div>
+      <div class="section">
+        <h3>Tile Palette</h3>
+        <div id="palette" class="tile-list"></div>
+        <div style="margin-top:6px;"><button id="add-tile-btn">+ Add Tile</button></div>
+        <p class="hint">C = color, R = randomize.<br>Right-click map to erase tiles.</p>
+      </div>
     </div>
-    <div class="section">
-      <h3>Tile Palette</h3>
-      <div id="palette" class="tile-list"></div>
-      <div style="margin-top:6px;"><button id="add-tile-btn">+ Add Tile</button></div>
-      <p class="hint">Use color box to pick.<br>R = randomize color.</p>
+
+    <!-- Spawn Mode Sections -->
+    <div class="spawn-mode-only hidden">
+      <div class="section">
+        <h3>Spawn Tools</h3>
+        <button id="spawn-eraser-btn" class="danger" style="width:100%;">Toggle Eraser</button>
+        <p class="hint">Eraser active = Left click erases spawns.</p>
+      </div>
+      <div class="section">
+        <h3>Spawn Brush</h3>
+        <div id="spawn-brush-list" class="tile-list"></div>
+        <p class="hint">Click palette to add. Click here to remove.</p>
+      </div>
+      <div class="section">
+        <h3>Spawn Types (Mobs)</h3>
+        <div id="spawn-palette" class="tile-list"></div>
+        <div style="margin-top:6px;"><button id="add-spawn-btn">+ Add Spawn Type</button></div>
+        <p class="hint">Weight = base spawn chance multiplier.</p>
+      </div>
     </div>
+
     <div class="section">
-      <h3>Tools</h3>
+      <h3>Map Tools</h3>
       <button id="spawn-btn" style="width:100%;">Set Spawn Position</button>
-      <p class="hint">Click to activate, then click map.</p>
+      <p class="hint">Click to activate, then click map to set player start.</p>
     </div>
     <div class="section">
       <h3>View</h3>
@@ -166,6 +215,10 @@ input[type="range"] { width: 100%; }
       <h3>Export</h3>
       <button id="save-btn" style="width:100%;">Save as Python Variables</button>
     </div>
+  </div>
+  <div id="canvas-wrapper">
+    <canvas id="canvas"></canvas>
+    <div id="cursor-pos">X: 0, Y: 0</div>
   </div>
 </div>
 
@@ -187,15 +240,44 @@ input[type="range"] { width: 100%; }
   </div>
 </div>
 
+<div id="add-spawn-dialog" class="dialog hidden">
+  <h3>Add New Spawn Type</h3>
+  <label>Name: <input id="new-spawn-name" type="text"></label>
+  <label>Weight (chance): <input id="new-spawn-weight" type="number" value="1" min="0" step="0.1"></label>
+  <div class="row">
+    <button id="add-spawn-confirm">Add</button>
+    <button id="add-spawn-cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="edit-spawns-dialog" class="dialog hidden">
+  <h3>Edit Spawns at <span id="edit-spawns-coords">X, Y</span></h3>
+  <div id="edit-spawns-list" style="min-width: 300px;"></div>
+  <button id="add-spawn-to-tile-btn" style="width: 100%; margin-top: 10px;">+ Add Spawn Type to Tile</button>
+  <div id="add-spawn-inline" class="hidden" style="margin-top: 10px; display: flex; gap: 5px;">
+    <select id="add-spawn-select"></select>
+    <button id="confirm-add-spawn-inline">Add</button>
+  </div>
+  <div class="row" style="justify-content: flex-end; margin-top: 15px;">
+    <button id="edit-spawns-close">Close</button>
+  </div>
+</div>
+
 <script>
 const state = {
+  mode: 'tiles', // 'tiles', 'spawns', 'edit'
+  spawnEraser: false,
   tilemap: [], width: 0, height: 0,
   tiles: {}, // name -> { color: string, solid: boolean }
   brushTiles: [], brushSize: 1,
+  spawnMap: [], // 2D array of arrays: [[{type, chance, rarities:[{rarity, chance}]}]]
+  spawnTypes: {}, // name -> { chance: number, color: string }
+  spawnBrush: [],
   scale: 32, cameraX: 0, cameraY: 0,
   hoverX: undefined, hoverY: undefined,
   spawnX: 0, spawnY: 0,
-  spawnSelectMode: false
+  spawnSelectMode: false,
+  editingTileX: -1, editingTileY: -1
 };
 
 const canvas = document.getElementById('canvas');
@@ -249,11 +331,12 @@ function parsePythonArray(str) {
   return result;
 }
 
-// Parses the custom output format containing SOLID_TILES, MAP, SPAWN_X, SPAWN_Y
+// Parses the custom output format containing SOLID_TILES, MAP, SPAWN_X, SPAWN_Y, SPAWN_MAP
 function parsePythonState(str) {
   let mapStr = str;
   let solidTiles = [];
   let spawnX = 0, spawnY = 0;
+  let spawnMap = [];
 
   const mapMatch = str.match(/MAP\s*=\s*(\[[\s\S]*\])/);
   if (mapMatch) mapStr = mapMatch[1];
@@ -269,22 +352,30 @@ function parsePythonState(str) {
   const yMatch = str.match(/SPAWN_Y\s*=\s*(-?\d+)/);
   if (yMatch) spawnY = parseInt(yMatch[1]);
 
+  const spawnMatch = str.match(/SPAWN_MAP\s*=\s*(\[[\s\S]*\])/);
+  if (spawnMatch) {
+    try {
+      let jsonStr = spawnMatch[1]
+        .replace(/'/g, '"')
+        .replace(/True/g, 'true')
+        .replace(/False/g, 'false')
+        .replace(/None/g, 'null');
+      spawnMap = JSON.parse(jsonStr);
+    } catch(e) { console.error("Failed to parse SPAWN_MAP", e); }
+  }
+
   const map = parsePythonArray(mapStr);
-  return { map, solidTiles, spawnX, spawnY };
+  return { map, solidTiles, spawnX, spawnY, spawnMap };
 }
 
 // ===== LocalStorage =====
 function saveState() {
   try {
     const data = {
-      tilemap: state.tilemap,
-      width: state.width,
-      height: state.height,
-      tiles: state.tiles,
-      brushTiles: state.brushTiles,
-      brushSize: state.brushSize,
-      spawnX: state.spawnX,
-      spawnY: state.spawnY
+      tilemap: state.tilemap, width: state.width, height: state.height,
+      tiles: state.tiles, brushTiles: state.brushTiles, brushSize: state.brushSize,
+      spawnX: state.spawnX, spawnY: state.spawnY,
+      spawnMap: state.spawnMap, spawnTypes: state.spawnTypes, spawnBrush: state.spawnBrush
     };
     localStorage.setItem('tileEditorData', JSON.stringify(data));
   } catch(e) { console.error("Save failed", e); }
@@ -294,14 +385,7 @@ function loadState() {
   try {
     const data = JSON.parse(localStorage.getItem('tileEditorData'));
     if (!data || !data.tilemap) return false;
-    state.tilemap = data.tilemap;
-    state.width = data.width;
-    state.height = data.height;
-    state.tiles = data.tiles;
-    state.brushTiles = data.brushTiles || [];
-    state.brushSize = data.brushSize || 1;
-    state.spawnX = data.spawnX || 0;
-    state.spawnY = data.spawnY || 0;
+    Object.assign(state, data);
     return true;
   } catch(e) { return false; }
 }
@@ -326,18 +410,15 @@ function drawTileToCanvas(c, name, x, y, size) {
 // ===== Rendering =====
 function resizeCanvas() {
   const w = wrapper.clientWidth, h = wrapper.clientHeight;
-  canvas.width = Math.floor(w * dpr);
-  canvas.height = Math.floor(h * dpr);
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
+  canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
   render();
 }
 
 function render() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const cw = canvas.width / dpr, ch = canvas.height / dpr;
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(0, 0, cw, ch);
+  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, cw, ch);
 
   if (state.width === 0 || state.height === 0) return;
 
@@ -357,11 +438,32 @@ function render() {
     }
   }
 
-  // Grid lines
+  if (state.mode === 'spawns' || state.mode === 'edit') {
+    for (let y = sy; y < ey; y++) {
+      for (let x = sx; x < ex; x++) {
+        const spawns = state.spawnMap[y][x];
+        if (spawns && spawns.length > 0) {
+          const px = Math.floor((x - state.cameraX) * ts);
+          const py = Math.floor((y - state.cameraY) * ts);
+          const firstName = spawns[0].type;
+          const spawnType = state.spawnTypes[firstName];
+          ctx.fillStyle = spawnType ? spawnType.color + '80' : 'rgba(255, 0, 255, 0.4)';
+          ctx.fillRect(px, py, ts, ts);
+
+          if (ts >= 12) {
+            ctx.fillStyle = 'rgba(255,255,255,1)';
+            ctx.font = `bold ${Math.floor(ts * 0.4)}px sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const text = spawns.map(s => s.type[0] || '?').join('');
+            ctx.fillText(text, px + ts / 2, py + ts / 2 + 1);
+          }
+        }
+      }
+    }
+  }
+
   if (ts >= 8) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.beginPath();
     const gx0 = Math.max(sx, Math.floor(state.cameraX));
     const gx1 = Math.min(ex, Math.ceil(state.cameraX + cw / ts));
     const gy0 = Math.max(sy, Math.floor(state.cameraY));
@@ -379,59 +481,62 @@ function render() {
     ctx.stroke();
   }
 
-  // Map boundary
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(
-    (0 - state.cameraX) * ts, (0 - state.cameraY) * ts,
-    state.width * ts, state.height * ts
-  );
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+  ctx.strokeRect((0 - state.cameraX) * ts, (0 - state.cameraY) * ts, state.width * ts, state.height * ts);
 
-  // Spawn position highlight
   if (state.spawnX !== undefined && state.spawnX !== null) {
-    ctx.strokeStyle = 'red';
-    ctx.lineWidth = Math.max(2, ts / 8);
-    ctx.strokeRect(
-      (state.spawnX - state.cameraX) * ts + 2,
-      (state.spawnY - state.cameraY) * ts + 2,
-      ts - 4, ts - 4
-    );
+    ctx.strokeStyle = 'red'; ctx.lineWidth = Math.max(2, ts / 8);
+    ctx.strokeRect((state.spawnX - state.cameraX) * ts + 2, (state.spawnY - state.cameraY) * ts + 2, ts - 4, ts - 4);
   }
 
-  // Brush preview
-  if (state.hoverX !== undefined && state.brushTiles.length > 0 && !state.spawnSelectMode) {
-    const half = Math.floor(state.brushSize / 2);
-    ctx.strokeStyle = 'rgba(255,255,0,0.9)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(
-      (state.hoverX - half - state.cameraX) * ts,
-      (state.hoverY - half - state.cameraY) * ts,
-      state.brushSize * ts, state.brushSize * ts
-    );
-  }
-}
-
-// ===== Painting =====
-function paintAt(tx, ty) {
-  if (state.brushTiles.length === 0) return;
-  const half = Math.floor(state.brushSize / 2);
-  for (let dy = 0; dy < state.brushSize; dy++) {
-    for (let dx = 0; dx < state.brushSize; dx++) {
-      const x = tx - half + dx, y = ty - half + dy;
-      if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
-        const idx = Math.floor(Math.random() * state.brushTiles.length);
-        state.tilemap[y][x] = state.brushTiles[idx];
+  if (state.hoverX !== undefined && !state.spawnSelectMode) {
+    if (state.mode === 'edit') {
+      ctx.strokeStyle = 'rgba(0, 255, 255, 0.9)'; ctx.lineWidth = 2;
+      ctx.strokeRect((state.hoverX - state.cameraX) * ts, (state.hoverY - state.cameraY) * ts, ts, ts);
+    } else {
+      const hasBrush = (state.mode === 'tiles' && state.brushTiles.length > 0) ||
+                       (state.mode === 'spawns' && (state.spawnBrush.length > 0 || state.spawnEraser));
+      if (hasBrush) {
+        const half = Math.floor(state.brushSize / 2);
+        let color = 'rgba(255,255,0,0.9)';
+        if (state.mode === 'spawns') color = state.spawnEraser ? 'rgba(255,0,0,0.9)' : 'rgba(0, 255, 0, 0.9)';
+        ctx.strokeStyle = color; ctx.lineWidth = 2;
+        ctx.strokeRect((state.hoverX - half - state.cameraX) * ts, (state.hoverY - half - state.cameraY) * ts, state.brushSize * ts, state.brushSize * ts);
       }
     }
   }
 }
 
-function paintLine(x0, y0, x1, y1) {
+// ===== Painting =====
+function paintAt(tx, ty, isRightClick = false) {
+  const half = Math.floor(state.brushSize / 2);
+  for (let dy = 0; dy < state.brushSize; dy++) {
+    for (let dx = 0; dx < state.brushSize; dx++) {
+      const x = tx - half + dx, y = ty - half + dy;
+      if (x >= 0 && x < state.width && y >= 0 && y < state.height) {
+        if (state.mode === 'tiles') {
+          if (isRightClick) state.tilemap[y][x] = null;
+          else if (state.brushTiles.length > 0) state.tilemap[y][x] = state.brushTiles[Math.floor(Math.random() * state.brushTiles.length)];
+        } else if (state.mode === 'spawns') {
+          if (isRightClick || state.spawnEraser) state.spawnMap[y][x] = [];
+          else if (state.spawnBrush.length > 0) {
+            state.spawnMap[y][x] = state.spawnBrush.map(name => ({
+              type: name, chance: state.spawnTypes[name].chance,
+              rarities: [{rarity: 1, chance: 1}] // Default rarity, editable via Edit mode
+            }));
+          }
+        }
+      }
+    }
+  }
+}
+
+function paintLine(x0, y0, x1, y1, isRightClick = false) {
   const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx - dy, x = x0, y = y0;
   while (true) {
-    paintAt(x, y);
+    paintAt(x, y, isRightClick);
     if (x === x1 && y === y1) break;
     const e2 = 2 * err;
     if (e2 > -dy) { err -= dy; x += sx; }
@@ -440,16 +545,15 @@ function paintLine(x0, y0, x1, y1) {
 }
 
 // ===== Input =====
-let isPanning = false, isPainting = false, panStart = null, lastPaintPos = null, spaceHeld = false;
+let isPanning = false, isPainting = false, isErasing = false, panStart = null, lastPaintPos = null, spaceHeld = false;
 
 function screenToTile(e) {
   const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-  return { tx: Math.floor(state.cameraX + mx / state.scale), ty: Math.floor(state.cameraY + my / state.scale) };
+  return { tx: Math.floor(state.cameraX + (e.clientX - rect.left) / state.scale), ty: Math.floor(state.cameraY + (e.clientY - rect.top) / state.scale) };
 }
 
 function updateCursor() {
-  if (state.spawnSelectMode) canvas.style.cursor = 'crosshair';
+  if (state.spawnSelectMode || state.mode === 'edit') canvas.style.cursor = 'pointer';
   else canvas.style.cursor = isPanning ? 'grabbing' : (spaceHeld ? 'grab' : 'crosshair');
 }
 
@@ -457,24 +561,23 @@ canvas.addEventListener('mousedown', e => {
   const { tx, ty } = screenToTile(e);
 
   if (state.spawnSelectMode && e.button === 0) {
-    state.spawnX = tx;
-    state.spawnY = ty;
-    state.spawnSelectMode = false;
-    document.getElementById('spawn-btn').classList.remove('active');
-    saveState();
-    render();
+    state.spawnX = tx; state.spawnY = ty; state.spawnSelectMode = false;
+    document.getElementById('spawn-btn').classList.remove('active'); saveState(); render(); return;
+  }
+
+  if (state.mode === 'edit' && e.button === 0) {
+    if (tx >= 0 && tx < state.width && ty >= 0 && ty < state.height) {
+      openEditSpawnsDialog(tx, ty);
+    }
     return;
   }
 
   if (e.button === 1 || (e.button === 0 && spaceHeld)) {
-    isPanning = true;
-    panStart = { x: e.clientX, y: e.clientY, camX: state.cameraX, camY: state.cameraY };
-    e.preventDefault();
-  } else if (e.button === 0 && state.brushTiles.length > 0) {
-    isPainting = true;
-    lastPaintPos = { x: tx, y: ty };
-    paintAt(tx, ty);
-    render();
+    isPanning = true; panStart = { x: e.clientX, y: e.clientY, camX: state.cameraX, camY: state.cameraY }; e.preventDefault();
+  } else if (e.button === 0) {
+    isPainting = true; lastPaintPos = { x: tx, y: ty }; paintAt(tx, ty, false); render();
+  } else if (e.button === 2) {
+    isErasing = true; lastPaintPos = { x: tx, y: ty }; paintAt(tx, ty, true); render();
   }
   updateCursor();
 });
@@ -483,70 +586,58 @@ canvas.addEventListener('mousemove', e => {
   const { tx, ty } = screenToTile(e);
   state.hoverX = tx; state.hoverY = ty;
 
-  cursorPosDiv.textContent = `X: ${tx}, Y: ${ty}`;
+  let info = `X: ${tx}, Y: ${ty}`;
+  if ((state.mode === 'spawns' || state.mode === 'edit') && state.spawnMap[ty] && state.spawnMap[ty][tx]) {
+    const spawns = state.spawnMap[ty][tx];
+    if (spawns.length > 0) info += " | Spawns: " + spawns.map(s => `${s.type}(x${s.chance})`).join(', ');
+  }
+  cursorPosDiv.textContent = info;
 
   if (isPanning && panStart) {
     state.cameraX = panStart.camX - (e.clientX - panStart.x) / state.scale;
     state.cameraY = panStart.camY - (e.clientY - panStart.y) / state.scale;
   } else if (isPainting && lastPaintPos) {
-    paintLine(lastPaintPos.x, lastPaintPos.y, tx, ty);
-    lastPaintPos = { x: tx, y: ty };
+    paintLine(lastPaintPos.x, lastPaintPos.y, tx, ty, false); lastPaintPos = { x: tx, y: ty };
+  } else if (isErasing && lastPaintPos) {
+    paintLine(lastPaintPos.x, lastPaintPos.y, tx, ty, true); lastPaintPos = { x: tx, y: ty };
   }
   render();
 });
 
 window.addEventListener('mouseup', () => {
-  if (isPainting) saveState(); // Save map after painting stroke ends
-  isPanning = false; isPainting = false; panStart = null; lastPaintPos = null;
-  updateCursor();
+  if (isPainting || isErasing) saveState();
+  isPanning = false; isPainting = false; isErasing = false; panStart = null; lastPaintPos = null; updateCursor();
 });
 
-canvas.addEventListener('mouseleave', () => {
-  state.hoverX = undefined; state.hoverY = undefined; render();
-});
-
+canvas.addEventListener('mouseleave', () => { state.hoverX = undefined; state.hoverY = undefined; render(); });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
-
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left, my = e.clientY - rect.top;
   const wx = state.cameraX + mx / state.scale, wy = state.cameraY + my / state.scale;
-  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  state.scale = Math.max(2, Math.min(256, state.scale * factor));
-  state.cameraX = wx - mx / state.scale;
-  state.cameraY = wy - my / state.scale;
-  render();
+  state.scale = Math.max(2, Math.min(256, state.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+  state.cameraX = wx - mx / state.scale; state.cameraY = wy - my / state.scale; render();
 }, { passive: false });
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'Space' && !e.target.matches('input, textarea')) {
-    spaceHeld = true; e.preventDefault(); updateCursor();
-  }
+  if (e.code === 'Space' && !e.target.matches('input, textarea')) { spaceHeld = true; e.preventDefault(); updateCursor(); }
 });
-document.addEventListener('keyup', e => {
-  if (e.code === 'Space') { spaceHeld = false; updateCursor(); }
-});
-
+document.addEventListener('keyup', e => { if (e.code === 'Space') { spaceHeld = false; updateCursor(); } });
 window.addEventListener('resize', resizeCanvas);
 
 // ===== UI =====
 const show = id => document.getElementById(id).classList.remove('hidden');
 const hide = id => document.getElementById(id).classList.add('hidden');
 
-// Check for saved session on load
-if (localStorage.getItem('tileEditorData')) {
-  document.getElementById('continue-btn').classList.remove('hidden');
-}
+if (localStorage.getItem('tileEditorData')) document.getElementById('continue-btn').classList.remove('hidden');
 
 document.getElementById('continue-btn').onclick = () => {
   if (loadState()) {
     document.getElementById('brush-size').value = state.brushSize;
     document.getElementById('brush-size-display').textContent = state.brushSize;
     startEditor();
-  } else {
-    alert("Failed to load session.");
-  }
+  } else alert("Failed to load session.");
 };
 
 document.getElementById('create-btn').onclick = () => show('create-dialog');
@@ -554,233 +645,334 @@ document.getElementById('create-cancel').onclick = () => hide('create-dialog');
 document.getElementById('create-confirm').onclick = () => {
   const w = Math.max(1, parseInt(document.getElementById('create-width').value) || 1);
   const h = Math.max(1, parseInt(document.getElementById('create-height').value) || 1);
-  const def = document.getElementById('create-default').value.trim() || 'empty';
-  createTilemap(w, h, def);
-  hide('create-dialog');
-  startEditor();
+  createTilemap(w, h, document.getElementById('create-default').value.trim() || 'empty');
+  hide('create-dialog'); startEditor();
 };
 
 document.getElementById('load-btn').onclick = () => show('load-dialog');
 document.getElementById('load-cancel').onclick = () => hide('load-dialog');
 document.getElementById('load-confirm').onclick = () => {
   try {
-    const inputStr = document.getElementById('load-input').value;
-    const { map, solidTiles, spawnX, spawnY } = parsePythonState(inputStr);
-    loadTilemap(map, solidTiles, spawnX, spawnY);
-    hide('load-dialog');
-    startEditor();
+    const { map, solidTiles, spawnX, spawnY, spawnMap } = parsePythonState(document.getElementById('load-input').value);
+    loadTilemap(map, solidTiles, spawnX, spawnY, spawnMap);
+    hide('load-dialog'); startEditor();
   } catch (e) { alert('Parse error: ' + e.message); }
 };
 
 function createTilemap(w, h, defaultTile) {
-  state.width = w; state.height = h;
-  state.tilemap = [];
-  for (let y = 0; y < h; y++) state.tilemap.push(new Array(w).fill(defaultTile));
-  state.tiles = {};
-  state.tiles[defaultTile] = { color: randomColor(), solid: false };
-  state.brushTiles = [defaultTile];
-  state.brushSize = 1;
-  state.spawnX = 0;
-  state.spawnY = 0;
+  state.width = w; state.height = h; state.tilemap = []; state.spawnMap = [];
+  for (let y = 0; y < h; y++) {
+    state.tilemap.push(new Array(w).fill(defaultTile));
+    state.spawnMap.push(new Array(w).fill(null).map(() => []));
+  }
+  state.tiles = {}; state.tiles[defaultTile] = { color: randomColor(), solid: false };
+  state.brushTiles = [defaultTile]; state.spawnTypes = {}; state.spawnBrush = [];
+  state.brushSize = 1; state.spawnX = 0; state.spawnY = 0;
   document.getElementById('brush-size').value = 1;
   document.getElementById('brush-size-display').textContent = 1;
   saveState();
 }
 
-function loadTilemap(arr, solidTiles = [], spawnX = 0, spawnY = 0) {
+function loadTilemap(arr, solidTiles = [], spawnX = 0, spawnY = 0, spawnMap = []) {
   state.height = arr.length; state.width = arr[0].length;
-  state.tilemap = arr.map(row => row.slice());
-  state.tiles = {};
+  state.tilemap = arr.map(row => row.slice()); state.tiles = {};
   const solidSet = new Set(solidTiles);
+  for (let y = 0; y < state.height; y++) for (let x = 0; x < state.width; x++) {
+    const name = state.tilemap[y][x];
+    if (name != null && !state.tiles[name]) state.tiles[name] = { color: randomColor(), solid: solidSet.has(name) };
+  }
+  state.brushTiles = Object.keys(state.tiles).slice(0, 1); state.brushSize = 1;
+  state.spawnX = spawnX; state.spawnY = spawnY;
+
+  state.spawnMap = [];
   for (let y = 0; y < state.height; y++) {
+    const row = [];
     for (let x = 0; x < state.width; x++) {
-      const name = state.tilemap[y][x];
-      if (name != null && !state.tiles[name]) {
-        state.tiles[name] = { color: randomColor(), solid: solidSet.has(name) };
-      }
+      row.push((spawnMap.length > y && spawnMap[y].length > x && Array.isArray(spawnMap[y][x])) ? spawnMap[y][x] : []);
+    }
+    state.spawnMap.push(row);
+  }
+
+  state.spawnTypes = state.spawnTypes || {};
+  for (let y = 0; y < state.height; y++) for (let x = 0; x < state.width; x++) {
+    for (const spawn of state.spawnMap[y][x]) {
+      if (!state.spawnTypes[spawn.type]) state.spawnTypes[spawn.type] = { chance: spawn.chance || 1, color: randomColor() };
     }
   }
-  const first = Object.keys(state.tiles)[0];
-  state.brushTiles = first ? [first] : [];
-  state.brushSize = 1;
-  state.spawnX = spawnX;
-  state.spawnY = spawnY;
+  state.spawnBrush = [];
   document.getElementById('brush-size').value = 1;
   document.getElementById('brush-size-display').textContent = 1;
   saveState();
 }
 
 function startEditor() {
-  hide('initial-screen');
-  show('editor');
-  requestAnimationFrame(() => {
-    resizeCanvas();
-    fitToScreen();
-    renderPalette();
-    renderBrushList();
-    render();
-  });
+  hide('initial-screen'); show('editor');
+  requestAnimationFrame(() => { resizeCanvas(); fitToScreen(); renderPalette(); renderBrushList(); renderSpawnPalette(); renderSpawnBrushList(); render(); });
 }
 
 function fitToScreen() {
   if (state.width === 0 || state.height === 0) return;
   const cw = canvas.width / dpr, ch = canvas.height / dpr;
   state.scale = Math.max(2, Math.min(cw / state.width, ch / state.height) * 0.9);
-  state.cameraX = (state.width - cw / state.scale) / 2;
-  state.cameraY = (state.height - ch / state.scale) / 2;
-  render();
+  state.cameraX = (state.width - cw / state.scale) / 2; state.cameraY = (state.height - ch / state.scale) / 2; render();
 }
 
 document.getElementById('fit-btn').onclick = fitToScreen;
-document.getElementById('new-btn').onclick = () => {
-  if (confirm('Discard current map and start over?')) {
-    localStorage.removeItem('tileEditorData');
-    location.reload();
-  }
-};
+document.getElementById('new-btn').onclick = () => { if (confirm('Discard current map and start over?')) { localStorage.removeItem('tileEditorData'); location.reload(); } };
+document.getElementById('brush-size').oninput = (e) => { state.brushSize = parseInt(e.target.value); document.getElementById('brush-size-display').textContent = state.brushSize; render(); };
+document.getElementById('spawn-btn').onclick = (e) => { state.spawnSelectMode = !state.spawnSelectMode; e.target.classList.toggle('active', state.spawnSelectMode); updateCursor(); };
+document.getElementById('spawn-eraser-btn').onclick = (e) => { state.spawnEraser = !state.spawnEraser; e.target.classList.toggle('active', state.spawnEraser); };
 
-document.getElementById('brush-size').oninput = (e) => {
-  state.brushSize = parseInt(e.target.value);
-  document.getElementById('brush-size-display').textContent = state.brushSize;
+// Mode Switching
+document.getElementById('mode-tiles').onclick = () => switchMode('tiles');
+document.getElementById('mode-spawns').onclick = () => switchMode('spawns');
+document.getElementById('mode-edit').onclick = () => switchMode('edit');
+
+function switchMode(m) {
+  state.mode = m;
+  document.getElementById('mode-tiles').classList.toggle('active', m === 'tiles');
+  document.getElementById('mode-spawns').classList.toggle('active', m === 'spawns');
+  document.getElementById('mode-edit').classList.toggle('active', m === 'edit');
+  document.querySelectorAll('.tile-mode-only').forEach(el => el.classList.toggle('hidden', m !== 'tiles'));
+  document.querySelectorAll('.spawn-mode-only').forEach(el => el.classList.toggle('hidden', m === 'tiles'));
   render();
-};
+}
 
-document.getElementById('spawn-btn').onclick = (e) => {
-  state.spawnSelectMode = !state.spawnSelectMode;
-  e.target.classList.toggle('active', state.spawnSelectMode);
-  updateCursor();
-};
-
+// ===== Tile Palette Rendering =====
 function renderPalette() {
-  const pal = document.getElementById('palette');
-  pal.innerHTML = '';
-  for (const name of Object.keys(state.tiles)) {
-    pal.appendChild(createTileItem(name, () => {
-      if (!state.brushTiles.includes(name)) {
-        state.brushTiles.push(name);
-        renderBrushList();
-      }
-    }, true));
-  }
+  const pal = document.getElementById('palette'); pal.innerHTML = '';
+  for (const name of Object.keys(state.tiles)) pal.appendChild(createTileItem(name, () => { if (!state.brushTiles.includes(name)) { state.brushTiles.push(name); renderBrushList(); } }, true));
 }
-
 function renderBrushList() {
-  const list = document.getElementById('brush-list');
-  list.innerHTML = '';
-  for (const name of state.brushTiles) {
-    list.appendChild(createTileItem(name, () => {
-      state.brushTiles = state.brushTiles.filter(t => t !== name);
-      renderBrushList();
-      saveState();
-    }, false));
-  }
+  const list = document.getElementById('brush-list'); list.innerHTML = '';
+  for (const name of state.brushTiles) list.appendChild(createTileItem(name, () => { state.brushTiles = state.brushTiles.filter(t => t !== name); renderBrushList(); saveState(); }, false));
 }
-
 function createTileItem(name, onClick, withActions) {
-  const item = document.createElement('div');
-  item.className = 'tile-item';
-  const sw = document.createElement('canvas');
-  sw.width = 58; sw.height = 58; sw.className = 'tile-swatch';
+  const item = document.createElement('div'); item.className = 'tile-item';
+  const sw = document.createElement('canvas'); sw.width = 58; sw.height = 58; sw.className = 'tile-swatch';
   drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
-  const lbl = document.createElement('div');
-  lbl.className = 'tile-name'; lbl.textContent = name; lbl.title = name;
+  const lbl = document.createElement('div'); lbl.className = 'tile-name'; lbl.textContent = name; lbl.title = name;
   item.appendChild(sw); item.appendChild(lbl);
-
   if (withActions) {
-    const acts = document.createElement('div');
-    acts.className = 'tile-actions';
-
-    // Row 1: Color Picker and 'R' Button
-    const row1 = document.createElement('div');
-    row1.className = 'row1';
-
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.value = state.tiles[name].color;
-    colorInput.title = 'Change color';
-    colorInput.style.flex = 'none';
-    colorInput.style.width = '40px';
+    const acts = document.createElement('div'); acts.className = 'tile-actions';
+    const row1 = document.createElement('div'); row1.className = 'row1';
+    const colorInput = document.createElement('input'); colorInput.type = 'color'; colorInput.value = state.tiles[name].color; colorInput.title = 'Change color'; colorInput.style.flex = 'none'; colorInput.style.width = '40px';
     colorInput.onclick = e => e.stopPropagation();
-    colorInput.oninput = e => {
-      state.tiles[name].color = e.target.value;
-      drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
-      renderBrushList();
-      render();
-      saveState();
-    };
+    colorInput.oninput = e => { state.tiles[name].color = e.target.value; drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58); renderBrushList(); render(); saveState(); };
     row1.appendChild(colorInput);
-
-    const rb = document.createElement('button');
-    rb.textContent = 'R'; rb.title = 'Randomize color';
-    rb.onclick = e => {
-      e.stopPropagation();
-      state.tiles[name].color = randomColor();
-      colorInput.value = state.tiles[name].color;
-      drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58);
-      renderBrushList();
-      render();
-      saveState();
-    };
-    row1.appendChild(rb);
-    acts.appendChild(row1);
-
-    // Row 2: Solid toggle button
-    const sb = document.createElement('button');
-    sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty';
-    sb.title = 'Toggle Solid';
-    sb.style.width = '100%';
-    sb.style.padding = '3px 0';
-    sb.onclick = e => {
-      e.stopPropagation();
-      state.tiles[name].solid = !state.tiles[name].solid;
-      sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty';
-      saveState();
-    };
-    acts.appendChild(sb);
-
-    item.appendChild(acts);
+    const rb = document.createElement('button'); rb.textContent = 'R'; rb.title = 'Randomize color';
+    rb.onclick = e => { e.stopPropagation(); state.tiles[name].color = randomColor(); colorInput.value = state.tiles[name].color; drawTileToCanvas(sw.getContext('2d'), name, 0, 0, 58); renderBrushList(); render(); saveState(); };
+    row1.appendChild(rb); acts.appendChild(row1);
+    const sb = document.createElement('button'); sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty'; sb.title = 'Toggle Solid'; sb.style.width = '100%'; sb.style.padding = '3px 0';
+    sb.onclick = e => { e.stopPropagation(); state.tiles[name].solid = !state.tiles[name].solid; sb.textContent = state.tiles[name].solid ? 'Solid' : 'Empty'; saveState(); };
+    acts.appendChild(sb); item.appendChild(acts);
   }
-
-  item.onclick = onClick;
-  return item;
+  item.onclick = onClick; return item;
 }
 
-document.getElementById('add-tile-btn').onclick = () => {
-  document.getElementById('new-tile-name').value = '';
-  show('add-tile-dialog');
-};
+document.getElementById('add-tile-btn').onclick = () => { document.getElementById('new-tile-name').value = ''; show('add-tile-dialog'); };
 document.getElementById('add-tile-cancel').onclick = () => hide('add-tile-dialog');
 document.getElementById('add-tile-confirm').onclick = () => {
   const name = document.getElementById('new-tile-name').value.trim();
   if (!name) { alert('Tile name required'); return; }
   if (state.tiles[name]) { alert('Tile already exists'); return; }
-  state.tiles[name] = { color: randomColor(), solid: false };
-  state.brushTiles.push(name);
-  hide('add-tile-dialog');
-  renderPalette(); renderBrushList();
-  saveState();
+  state.tiles[name] = { color: randomColor(), solid: false }; state.brushTiles.push(name);
+  hide('add-tile-dialog'); renderPalette(); renderBrushList(); saveState();
 };
 
+// ===== Spawn Palette Rendering =====
+function renderSpawnPalette() {
+  const pal = document.getElementById('spawn-palette'); pal.innerHTML = '';
+  for (const name of Object.keys(state.spawnTypes)) pal.appendChild(createSpawnItem(name, () => { if (!state.spawnBrush.includes(name)) { state.spawnBrush.push(name); renderSpawnBrushList(); } }, true));
+}
+function renderSpawnBrushList() {
+  const list = document.getElementById('spawn-brush-list'); list.innerHTML = '';
+  for (const name of state.spawnBrush) list.appendChild(createSpawnItem(name, () => { state.spawnBrush = state.spawnBrush.filter(t => t !== name); renderSpawnBrushList(); saveState(); }, false));
+}
+function createSpawnItem(name, onClick, withActions) {
+  const item = document.createElement('div'); item.className = 'tile-item';
+  const sw = document.createElement('canvas'); sw.width = 58; sw.height = 58; sw.className = 'tile-swatch';
+  const c = sw.getContext('2d'); c.fillStyle = state.spawnTypes[name].color; c.fillRect(0, 0, 58, 58);
+  c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = `bold 36px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(name[0] || '?', 29, 30);
+  const lbl = document.createElement('div'); lbl.className = 'tile-name'; lbl.textContent = name; lbl.title = name;
+  item.appendChild(sw); item.appendChild(lbl);
+  if (withActions) {
+    const acts = document.createElement('div'); acts.className = 'tile-actions';
+    const row1 = document.createElement('div'); row1.className = 'row1';
+    const colorInput = document.createElement('input'); colorInput.type = 'color'; colorInput.value = state.spawnTypes[name].color; colorInput.title = 'Change color'; colorInput.style.flex = 'none'; colorInput.style.width = '40px';
+    colorInput.onclick = e => e.stopPropagation();
+    colorInput.oninput = e => { state.spawnTypes[name].color = e.target.value; renderSpawnPalette(); renderSpawnBrushList(); render(); saveState(); };
+    row1.appendChild(colorInput);
+    const rb = document.createElement('button'); rb.textContent = 'R'; rb.title = 'Randomize color';
+    rb.onclick = e => { e.stopPropagation(); state.spawnTypes[name].color = randomColor(); colorInput.value = state.spawnTypes[name].color; renderSpawnPalette(); renderSpawnBrushList(); render(); saveState(); };
+    row1.appendChild(rb); acts.appendChild(row1);
+    const weightInput = document.createElement('input'); weightInput.type = 'number'; weightInput.className = 'weight-input'; weightInput.value = state.spawnTypes[name].chance; weightInput.min = 0; weightInput.step = 0.1; weightInput.title = 'Weight (chance)';
+    weightInput.onclick = e => e.stopPropagation();
+    weightInput.oninput = e => { state.spawnTypes[name].chance = parseFloat(e.target.value) || 0; saveState(); };
+    acts.appendChild(weightInput); item.appendChild(acts);
+  }
+  item.onclick = onClick; return item;
+}
+
+document.getElementById('add-spawn-btn').onclick = () => { document.getElementById('new-spawn-name').value = ''; document.getElementById('new-spawn-weight').value = 1; show('add-spawn-dialog'); };
+document.getElementById('add-spawn-cancel').onclick = () => hide('add-spawn-dialog');
+document.getElementById('add-spawn-confirm').onclick = () => {
+  const name = document.getElementById('new-spawn-name').value.trim();
+  if (!name) { alert('Spawn name required'); return; }
+  if (state.spawnTypes[name]) { alert('Spawn type already exists'); return; }
+  state.spawnTypes[name] = { chance: parseFloat(document.getElementById('new-spawn-weight').value) || 1, color: randomColor() };
+  state.spawnBrush.push(name); hide('add-spawn-dialog'); renderSpawnPalette(); renderSpawnBrushList(); saveState();
+};
+
+// ===== Edit Spawns Dialog Logic =====
+function openEditSpawnsDialog(x, y) {
+  state.editingTileX = x; state.editingTileY = y;
+  document.getElementById('edit-spawns-coords').textContent = `${x}, ${y}`;
+  document.getElementById('add-spawn-inline').classList.add('hidden');
+  renderEditSpawnsList();
+  show('edit-spawns-dialog');
+}
+
+function renderEditSpawnsList() {
+  const x = state.editingTileX, y = state.editingTileY;
+  const listDiv = document.getElementById('edit-spawns-list');
+  listDiv.innerHTML = '';
+  const spawns = state.spawnMap[y][x];
+
+  if (spawns.length === 0) {
+    listDiv.innerHTML = '<p style="color:#777; text-align:center; padding:10px;">No spawns on this tile.</p>';
+  }
+
+  spawns.forEach((spawn, index) => {
+    const block = document.createElement('div');
+    block.className = 'edit-spawn-block';
+
+    const header = document.createElement('div');
+    header.className = 'edit-spawn-header';
+
+    const title = document.createElement('div');
+    title.innerHTML = `${spawn.type} <span style="font-size:10px; color:#888;">(Base Weight: <input type="number" class="spawn-weight" value="${spawn.chance}" step="0.1" style="width:50px; padding:2px;"></span>)`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.className = 'danger';
+    removeBtn.onclick = () => {
+      spawns.splice(index, 1);
+      saveState(); renderEditSpawnsList(); render();
+    };
+
+    header.appendChild(title);
+    header.appendChild(removeBtn);
+    block.appendChild(header);
+
+    const raritiesContainer = document.createElement('div');
+
+    function renderRarities() {
+      raritiesContainer.innerHTML = '';
+      spawn.rarities.forEach((r, rIdx) => {
+        const rDiv = document.createElement('div');
+        rDiv.className = 'rarity-row';
+
+        rDiv.innerHTML = `
+          <span>Rarity:</span>
+          <input type="number" class="rarity-val" value="${r.rarity}" min="1" style="width:50px;">
+          <span>Chance:</span>
+          <input type="number" class="rarity-chance" value="${r.chance}" step="0.1" style="width:50px;">
+        `;
+
+        const delRBtn = document.createElement('button');
+        delRBtn.textContent = 'X'; delRBtn.className = 'danger'; delRBtn.style.padding = '4px';
+        delRBtn.onclick = () => { spawn.rarities.splice(rIdx, 1); saveState(); renderRarities(); };
+
+        rDiv.querySelector('.rarity-val').oninput = (e) => { spawn.rarities[rIdx].rarity = parseInt(e.target.value) || 1; saveState(); };
+        rDiv.querySelector('.rarity-chance').oninput = (e) => { spawn.rarities[rIdx].chance = parseFloat(e.target.value) || 0; saveState(); };
+
+        rDiv.appendChild(delRBtn);
+        raritiesContainer.appendChild(rDiv);
+      });
+    }
+    renderRarities();
+    block.appendChild(raritiesContainer);
+
+    header.querySelector('.spawn-weight').oninput = (e) => { spawn.chance = parseFloat(e.target.value) || 0; saveState(); };
+
+    const addRarityBtn = document.createElement('button');
+    addRarityBtn.textContent = '+ Add Rarity';
+    addRarityBtn.style.cssText = 'margin-top: 8px; width: 100%; padding: 4px;';
+    addRarityBtn.onclick = () => { spawn.rarities.push({ rarity: 1, chance: 1 }); saveState(); renderRarities(); };
+    block.appendChild(addRarityBtn);
+
+    listDiv.appendChild(block);
+  });
+}
+
+document.getElementById('add-spawn-to-tile-btn').onclick = () => {
+  const select = document.getElementById('add-spawn-select');
+  select.innerHTML = '';
+  let hasTypes = false;
+  for (const name of Object.keys(state.spawnTypes)) {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    select.appendChild(opt);
+    hasTypes = true;
+  }
+  if (!hasTypes) { alert("No spawn types exist. Create one first in Paint Spawns mode."); return; }
+  document.getElementById('add-spawn-inline').classList.remove('hidden');
+};
+
+document.getElementById('confirm-add-spawn-inline').onclick = () => {
+  const name = document.getElementById('add-spawn-select').value;
+  if(!name) return;
+  const x = state.editingTileX, y = state.editingTileY;
+  state.spawnMap[y][x].push({
+    type: name,
+    chance: state.spawnTypes[name].chance,
+    rarities: [{ rarity: 1, chance: 1 }]
+  });
+  saveState();
+  document.getElementById('add-spawn-inline').classList.add('hidden');
+  renderEditSpawnsList();
+  render();
+};
+
+document.getElementById('edit-spawns-close').onclick = () => hide('edit-spawns-dialog');
+
+// ===== Export =====
 document.getElementById('save-btn').onclick = () => {
-  const solidTilesStr = Object.keys(state.tiles)
-    .filter(k => state.tiles[k].solid)
-    .map(t => `"${t}"`).join(', ');
+  const solidTilesStr = Object.keys(state.tiles).filter(k => state.tiles[k].solid).map(t => `"${t}"`).join(', ');
 
   let mapStr = '[\n';
   for (let y = 0; y < state.height; y++) {
     mapStr += '  [';
     for (let x = 0; x < state.width; x++) {
-      const v = String(state.tilemap[y][x]).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      mapStr += '"' + v + '"';
-      if (x < state.width - 1) mapStr += ', ';
+      const v = state.tilemap[y][x] === null ? 'null' : `"${String(state.tilemap[y][x]).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+      mapStr += v; if (x < state.width - 1) mapStr += ', ';
     }
-    mapStr += ']';
-    if (y < state.height - 1) mapStr += ',';
-    mapStr += '\n';
+    mapStr += ']'; if (y < state.height - 1) mapStr += ','; mapStr += '\n';
   }
   mapStr += ']';
 
-  const output = `SOLID_TILES = [${solidTilesStr}]\n\nMAP = ${mapStr}\nSPAWN_X = ${state.spawnX}\nSPAWN_Y = ${state.spawnY}`;
+  let spawnMapStr = '[\n';
+  for (let y = 0; y < state.height; y++) {
+    spawnMapStr += '  [';
+    for (let x = 0; x < state.width; x++) {
+      const cell = state.spawnMap[y][x];
+      if (cell.length === 0) {
+        spawnMapStr += '[]';
+      } else {
+        const items = cell.map(s => {
+          const raritiesStr = s.rarities.map(r => `{'rarity': ${r.rarity}, 'chance': ${r.chance}}`).join(', ');
+          return `{'type': '${s.type}', 'rarities': [${raritiesStr}], 'chance': ${s.chance}}`;
+        }).join(', ');
+        spawnMapStr += `[${items}]`;
+      }
+      if (x < state.width - 1) spawnMapStr += ', ';
+    }
+    spawnMapStr += ']'; if (y < state.height - 1) spawnMapStr += ','; spawnMapStr += '\n';
+  }
+  spawnMapStr += ']';
+
+  const output = `SOLID_TILES = [${solidTilesStr}]\n\nMAP = ${mapStr}\nSPAWN_X = ${state.spawnX}\nSPAWN_Y = ${state.spawnY}\n\nSPAWN_MAP = ${spawnMapStr}`;
 
   document.getElementById('save-output').value = output;
   show('save-dialog');
@@ -788,15 +980,11 @@ document.getElementById('save-btn').onclick = () => {
 
 document.getElementById('save-close').onclick = () => hide('save-dialog');
 document.getElementById('save-copy').onclick = async () => {
-  const ta = document.getElementById('save-output');
-  const btn = document.getElementById('save-copy');
+  const ta = document.getElementById('save-output'); const btn = document.getElementById('save-copy');
   try {
     await navigator.clipboard.writeText(ta.value);
-    const o = btn.textContent; btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = o, 1500);
-  } catch {
-    ta.select(); document.execCommand('copy');
-  }
+    const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1500);
+  } catch { ta.select(); document.execCommand('copy'); }
 };
 </script>
 </body>

@@ -176,7 +176,11 @@ export function create_mob(identity) {
 
     const username_div = document.createElement('div');
     username_div.textContent = data['name'] || identity;
-    username_div.style.color = 'white';
+    if (data["type"] === "flower") {
+        username_div.style.color = '#fff767';
+    } else {
+        username_div.style.color = 'white';
+    }
     username_div.style.fontFamily = "'Ubuntu', sans-serif";
     username_div.style.fontSize = '20px';
     username_div.style.fontWeight = 'bold';

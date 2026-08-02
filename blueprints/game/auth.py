@@ -141,7 +141,6 @@ def on_play():
     app.game_state['mobs'][identity]['connection_sid'] = sid
     emit('state', state_response(sid, include_map=False, include_personal=True))
     emit('state', status_response({'scene_name': 'game'}))
-    create_mob(type='ladybug', position={'x': settings.SPAWN_X, 'y': settings.SPAWN_Y, 'height': 0}, name='ladybug', rarity=3)
 
 @socket_io.on('move')
 def on_move(data):
@@ -158,7 +157,10 @@ def on_move(data):
         return
     x = data['x']
     y = data['y']
-    tile_standing = app.game_state['map'][math.floor(y + 0.5)][math.floor(x + 0.5)]
+    try:
+        tile_standing = app.game_state['map'][math.floor(y + 0.5)][math.floor(x + 0.5)]
+    except:
+        tile_standing = "water"
     rotation = data['rotation']
     if tile_standing in settings.SOLID_BLOCKS:
         return

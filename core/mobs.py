@@ -77,29 +77,51 @@ class Mob:
                 cy += sy
         return True
 
-    def move(self, dx, dy):
+    def move(self, dx, dy, rotate=True):
         cur = self.data['position']
         map_grid = self.game.get('map', [])
         if not map_grid:
             return False
 
+        start_x = cur['x']
+        start_y = cur['y']
         moved = False
 
-        nx = cur['x'] + dx
-        tx = math.floor(nx + 0.5)
-        ty_cur = math.floor(cur['y'] + 0.5)
-        if 0 <= ty_cur < len(map_grid) and 0 <= tx < len(map_grid[0]):
-            if map_grid[ty_cur][tx] not in settings.SOLID_BLOCKS:
-                cur['x'] = nx
-                moved = True
+        step_x = 1 if dx > 0 else -1 if dx < 0 else 0
+        remaining = abs(dx)
+        while remaining > 0:
+            step = min(1.0, remaining)
+            nx = cur['x'] + step_x * step
+            tx = math.floor(nx + 0.5)
+            ty_cur = math.floor(cur['y'] + 0.5)
 
-        ny = cur['y'] + dy
-        ty = math.floor(ny + 0.5)
-        tx_cur = math.floor(cur['x'] + 0.5)
-        if 0 <= ty < len(map_grid) and 0 <= tx_cur < len(map_grid[0]):
-            if map_grid[ty][tx_cur] not in settings.SOLID_BLOCKS:
-                cur['y'] = ny
-                moved = True
+            if 0 <= ty_cur < len(map_grid) and 0 <= tx < len(map_grid[0]):
+                if map_grid[ty_cur][tx] in settings.SOLID_BLOCKS:
+                    break
+            cur['x'] = nx
+            moved = True
+            remaining -= step
+
+        step_y = 1 if dy > 0 else -1 if dy < 0 else 0
+        remaining = abs(dy)
+        while remaining > 0:
+            step = min(1.0, remaining)
+            ny = cur['y'] + step_y * step
+            ty = math.floor(ny + 0.5)
+            tx_cur = math.floor(cur['x'] + 0.5)
+
+            if 0 <= ty < len(map_grid) and 0 <= tx_cur < len(map_grid[0]):
+                if map_grid[ty][tx_cur] in settings.SOLID_BLOCKS:
+                    break
+            cur['y'] = ny
+            moved = True
+            remaining -= step
+
+        if moved and rotate:
+            real_dx = cur['x'] - start_x
+            real_dy = cur['y'] - start_y
+            yaw = math.atan2(-real_dx, -real_dy)
+            self.data['rotation'] = [0, yaw, 0]
 
         return moved
 
@@ -246,3 +268,38 @@ class Ladybug(Mob):
         self.data['health'] += self.data['healing_speed'] / settings.TPS
         if self.data['health'] > self.data['max_health']:
             self.data['health'] = self.data['max_health']
+
+class Dragonfly(Mob):
+    def __init__(self, mob_data, game_state):
+        super().__init__(mob_data, game_state)
+        self.time = 0
+        self.state = 'flying'
+        self.base_height = mob_data['rarity'] * 1
+        self.teleport_distance = mob_data['rarity'] * 5
+        self.teleport_delay = math.floor(7 - mob_data['rarity'] * 0.5)
+
+        mob_data['height'] = self.base_height
+
+    @classmethod
+    def spawn(cls, **kwargs):
+        data = cls.spawn_default(**kwargs)
+        data['max_health'] = data['rarity'] * 15
+        data['health'] = data['max_health']
+        data['body_damage'] = 10 + 3 * data['rarity']
+        data['healing_speed'] = 3
+        data['height'] = data['rarity'] * 1
+        return data
+
+    def update_position(self):
+        self.time += 1
+
+        if self.state == 'flying':
+            self.data['position']['height'] =  self.base_height + math.sin(self.time * 0.5) * 2
+
+        if self.time > settings.TPS:
+            self.time = 0
+            if random.randint(1, self.teleport_delay) == 1:
+                dx = random.randint(-self.teleport_distance, self.teleport_distance)
+                dy = random.randint(-self.teleport_distance, self.teleport_distance)
+                self.move(dx, dy)
+                self.data['height'] = self.base_height
