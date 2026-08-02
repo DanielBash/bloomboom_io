@@ -181,11 +181,22 @@ class Mob:
                 mob['health'] -= self.data['body_damage']
                 self.data['health'] -= mob['body_damage']
 
+    def check_bounds(self):
+        x = self.data['position']['x']
+        y = self.data['position']['y']
+        try:
+            tile_standing = self.game['map'][math.floor(y + 0.5)][math.floor(x + 0.5)]
+        except:
+            tile_standing = "water"
+        if tile_standing in settings.SOLID_BLOCKS:
+            self.data["health"] = 0
+
     def update(self):
         self.pre_update()
         self.update_position()
         self.update_collisions()
         self.post_update()
+        self.check_bounds()
 
 
 class Flower(Mob):
@@ -217,7 +228,7 @@ class Ladybug(Mob):
 
         panic_factor = 1.0 + (1.0 - health_ratio) * 2.0
         base_speed = 0.5
-        speed = base_speed * panic_factor
+        speed = base_speed * (panic_factor ** 2)
         speed_per_tick = speed / settings.TPS
 
         direction_change_chance = 0.01 + (1.0 - health_ratio) * 0.05
@@ -303,3 +314,183 @@ class Dragonfly(Mob):
                 dy = random.randint(-self.teleport_distance, self.teleport_distance)
                 self.move(dx, dy)
                 self.data['height'] = self.base_height
+
+class Grasshopper(Mob):
+    def __init__(self, mob_data, game_state):
+        super().__init__(mob_data, game_state)
+        self.state = 'idle'
+        self.idle_timer = 0
+        self.idle_duration = random.randint(2, 5) * settings.TPS
+        self.velocity_x = 0.0
+        self.velocity_y = 0.0
+        self.velocity_z = 0.0
+        self.gravity = 25.0
+
+    @classmethod
+    def spawn(cls, **kwargs):
+        data = cls.spawn_default(**kwargs)
+        data['max_health'] = data['rarity'] * 30
+        data['health'] = data['max_health']
+        data['body_damage'] = 5 + data['rarity']
+        data['healing_speed'] = 1
+        return data
+
+    def update_position(self):
+        dt = 1.0 / settings.TPS
+
+        if self.state == 'idle':
+            self.idle_timer += 1
+            if self.idle_timer >= self.idle_duration:
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(4, 10) + self.data['rarity'] * 2
+                flight_time = random.uniform(0.7, 1.2)
+
+                self.velocity_x = (math.cos(angle) * distance) / flight_time
+                self.velocity_y = (math.sin(angle) * distance) / flight_time
+                self.velocity_z = 0.5 * self.gravity * flight_time
+                self.state = 'jumping'
+            return
+
+        dx = self.velocity_x * dt
+        dy = self.velocity_y * dt
+        self.move(dx, dy, rotate=True)
+
+        new_height = self.data['position'].get('height', 0) + self.velocity_z * dt
+        self.velocity_z -= self.gravity * dt
+
+        if new_height <= 0 and self.velocity_z < 0:
+            self.data['position']['height'] = 0
+            self.state = 'idle'
+            self.idle_timer = 0
+            self.idle_duration = random.randint(2, 5) * settings.TPS
+        else:
+            self.data['position']['height'] = new_height
+
+    def post_update(self):
+        self.data['health'] += self.data['healing_speed'] / settings.TPS
+        if self.data['health'] > self.data['max_health']:
+            self.data['health'] = self.data['max_health']
+
+
+class Spider(Mob):
+    def __init__(self, mob_data, game_state):
+        super().__init__(mob_data, game_state)
+        self.target_identity = None
+        self.search_timer = 0
+
+    def find_target(self, require_visibility=False):
+        mobs_list = list(self.other_mobs.values())
+        if not mobs_list:
+            return None
+        for _ in range(10):
+            candidate = random.choice(mobs_list)
+            if candidate.get('identity') == self.data.get('identity'):
+                continue
+            if candidate.get('type') == 'flower':
+                if not require_visibility or self.can_see(candidate['identity']):
+                    return candidate['identity']
+        return None
+
+    def update_target(self):
+        if self.target_identity is not None:
+            if self.target_identity not in self.other_mobs:
+                self.target_identity = None
+                self.target_identity = self.find_target(require_visibility=True)
+                self.search_timer = 0
+                return
+        if self.target_identity is None:
+            self.search_timer += 1
+            if self.search_timer >= settings.TPS:
+                self.search_timer = 0
+                self.target_identity = self.find_target(require_visibility=False)
+
+    def post_update(self):
+        self.data['health'] += self.data['healing_speed'] / settings.TPS
+        if self.data['health'] > self.data['max_health']:
+            self.data['health'] = self.data['max_health']
+
+
+class Spiderkid(Spider):
+    @classmethod
+    def spawn(cls, **kwargs):
+        data = cls.spawn_default(**kwargs)
+        data['max_health'] = 8
+        data['health'] = 8
+        data['body_damage'] = 1
+        data['healing_speed'] = 0
+        data['rarity'] = 1
+        return data
+
+    def update_position(self):
+        self.update_target()
+        if self.target_identity is None:
+            return
+        target = self.other_mobs.get(self.target_identity)
+        if not target:
+            self.target_identity = None
+            return
+
+        speed = 1.8
+        speed_per_tick = speed / settings.TPS
+
+        dx = target['position']['x'] - self.data['position']['x']
+        dy = target['position']['y'] - self.data['position']['y']
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance > 0:
+            move_x = (dx / distance) * speed_per_tick
+            move_y = (dy / distance) * speed_per_tick
+            self.move(move_x, move_y)
+
+
+class Spidermom(Spider):
+    def __init__(self, mob_data, game_state):
+        super().__init__(mob_data, game_state)
+        self._kids_spawned = False
+
+    @classmethod
+    def spawn(cls, **kwargs):
+        data = cls.spawn_default(**kwargs)
+        data['max_health'] = data['rarity'] * 50
+        data['health'] = data['max_health']
+        data['body_damage'] = 3
+        data['healing_speed'] = 2
+        return data
+
+    def update_position(self):
+        self.update_target()
+        if self.target_identity is None:
+            return
+        target = self.other_mobs.get(self.target_identity)
+        if not target:
+            self.target_identity = None
+            return
+
+        speed = 1.0
+        speed_per_tick = speed / settings.TPS
+
+        dx = self.data['position']['x'] - target['position']['x']
+        dy = self.data['position']['y'] - target['position']['y']
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance > 0:
+            move_x = (dx / distance) * speed_per_tick
+            move_y = (dy / distance) * speed_per_tick
+            self.move(-move_x, -move_y)
+
+    def post_update(self):
+        if self.data['health'] < 10:
+            self.data['health'] = 0
+            self._kids_spawned = True
+            num_kids = 4 + self.data.get('rarity', 1) * 3
+            for _ in range(num_kids):
+                kid_data = Spiderkid.spawn(
+                    position={
+                        'x': self.data['position']['x'] + random.uniform(-1, 1),
+                        'y': self.data['position']['y'] + random.uniform(-1, 1),
+                        'height': 0,
+                    },
+                    rarity=1,
+                )
+                self.game['mobs'][kid_data['identity']] = kid_data
+        return True

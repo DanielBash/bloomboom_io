@@ -102,7 +102,7 @@ def tick_mobs(app):
 
     current_mobs = app.game_state['mobs']
 
-    for mob_id, mob_data in current_mobs.items():
+    for mob_id, mob_data in list(current_mobs.items()):
         if mob_id not in app.mob_instances:
             mob_type = mob_data.get('type', 'default')
             MobClass = getattr(mobs, mob_type.capitalize(), None)
@@ -163,7 +163,7 @@ def tick_spawns(app):
                     'height': 0
                 },
                 type=chosen_type['type'],
-                rarity=chosen_rarity['rarity'],
+                rarity=chosen_rarity['rarity'] + 3,
                 app=app
             )
 
