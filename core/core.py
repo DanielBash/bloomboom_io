@@ -163,7 +163,7 @@ def tick_spawns(app):
                     'height': 0
                 },
                 type=chosen_type['type'],
-                rarity=chosen_rarity['rarity'] + 3,
+                rarity=chosen_rarity['rarity'] + 7,
                 app=app
             )
 

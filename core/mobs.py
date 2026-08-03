@@ -26,7 +26,8 @@ class Mob:
             'max_health': 100,
             'body_damage': 3,
             'rarity': 1,
-            'healing_speed': 2
+            'healing_speed': 2,
+            'team': 1
         }
 
         for i in kwargs:
@@ -178,8 +179,9 @@ class Mob:
 
                 mob['position']['x'] += push_x
                 mob['position']['y'] += push_y
-                mob['health'] -= self.data['body_damage']
-                self.data['health'] -= mob['body_damage']
+                if mob['team'] != self.data['team']:
+                    mob['health'] -= self.data['body_damage']
+                    self.data['health'] -= mob['body_damage']
 
     def check_bounds(self):
         x = self.data['position']['x']
@@ -200,6 +202,13 @@ class Mob:
 
 
 class Flower(Mob):
+
+    @classmethod
+    def spawn(cls, **kwargs):
+        data = cls.spawn_default(**kwargs)
+        data['team'] = 2
+        return data
+
     def post_update(self):
         self.data['health'] += self.data['healing_speed'] / settings.TPS
         if self.data['health'] > self.data['max_health']:
